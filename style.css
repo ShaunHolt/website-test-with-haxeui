@@ -1,0 +1,21 @@
+body{
+   background:grey;
+}
+
+h1{
+   font-size:5rem;
+   font-weight:900;
+   background:url('https://media.istockphoto.com/illustrations/red-electric-lighting-abstract-electrical-storm-illustration-id672983232?k=6&m=672983232&s=612x612&w=0&h=dUWczjpXkFqrmuHr4j5E8ix6ynC2bsuLDpfOs0GOuwY=');
+   color:transparent;
+   -webkit-background-clip:text;
+   -webkit-text-stroke:2px blue;
+   background-size:contain;
+   margin-top:000px;
+   animation:bg-shift 1s infinite linear;
+}
+
+@keyframes bg-shift{
+   from{
+      background-position:200px 0;
+   }
+}
