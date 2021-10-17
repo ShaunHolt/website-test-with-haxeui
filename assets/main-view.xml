@@ -17,6 +17,7 @@
                 font-size: 16px;
                 color: white;
                 filter: drop-shadow(1, 45, #000000, 0.2, 0, 0, 0, 3, false);
+
             }
             
             .styled-button:hover {
@@ -27,26 +28,24 @@
                 background: #47a3ff #1b75d0;
                 border-color: #28619a;
             }
+
         </style>
 
 	<hbox width="100%" left="540" top="110" >
             <button text="Videos" styleName="styled-button" style="background-opacity: .1"/>
-            <button text="Chat" styleName="styled-button" style="background-opacity: .1"/>
             <button text="Social" styleName="styled-button" style="background-opacity: .1"/>
             <button text="Sensors" styleName="styled-button" style="background-opacity: .1"/>
-            <button text="Robotics" styleName="styled-button" style="background-opacity: .1"/>
+            <button text="Robotics" id="customNonModalDialogButtonRobotics" styleName="styled-button" style="background-opacity: .1"/>
             <button text="Toolbox" styleName="styled-button" style="background-opacity: .1"/>
             <button text="Guides" styleName="styled-button" style="background-opacity: .1"/>
+            <button text="About" styleName="styled-button" style="background-opacity: .1"/>
             <button text="Hosting" styleName="styled-button" style="background-opacity: .1"/>
-
-<!--            <button text="Toggle" toggle="true" selected="true" styleName="styled-button" style="background-opacity: .1"/>
-            <button text="Repeater" repeater="true" styleName="styled-button" style="background-opacity: .1"/>-->
         </hbox>
 
         <box left="180" top="250" width="100%" height="100%" style="background-color: black;border:0px solid blue;background-opacity: .5" />
         <box left="230" top="300" width="75%" height="75%" style="background-color: white;border:0px solid green;background-opacity: .1" />
 
-        <image resource="haxeui-core/styles/default/haxeui.png" width="100" height="100" style="border:0px solid #ababab" left="1670" top="110" />
+        <image resource="haxeui-core/styles/default/haxeui.png" width="100" height="100" style="border:0px solid #ababab" left="1630" top="110" />
         <image resource="assets/profile.jpg" width="300" height="300" style="border:0px solid #ababab" left="360" top="430" />
 
     </absolute>

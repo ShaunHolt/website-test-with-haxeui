@@ -6,132 +6,6 @@ function $extend(from, fields) {
 	if( fields.toString !== Object.prototype.toString ) proto.toString = fields.toString;
 	return proto;
 }
-var EReg = function(r,opt) {
-	this.r = new RegExp(r,opt.split("u").join(""));
-};
-$hxClasses["EReg"] = EReg;
-EReg.__name__ = "EReg";
-EReg.prototype = {
-	r: null
-	,match: function(s) {
-		if(this.r.global) {
-			this.r.lastIndex = 0;
-		}
-		this.r.m = this.r.exec(s);
-		this.r.s = s;
-		return this.r.m != null;
-	}
-	,matched: function(n) {
-		if(this.r.m != null && n >= 0 && n < this.r.m.length) {
-			return this.r.m[n];
-		} else {
-			throw haxe_Exception.thrown("EReg::matched");
-		}
-	}
-	,matchedPos: function() {
-		if(this.r.m == null) {
-			throw haxe_Exception.thrown("No string matched");
-		}
-		return { pos : this.r.m.index, len : this.r.m[0].length};
-	}
-	,matchSub: function(s,pos,len) {
-		if(len == null) {
-			len = -1;
-		}
-		if(this.r.global) {
-			this.r.lastIndex = pos;
-			this.r.m = this.r.exec(len < 0 ? s : HxOverrides.substr(s,0,pos + len));
-			var b = this.r.m != null;
-			if(b) {
-				this.r.s = s;
-			}
-			return b;
-		} else {
-			var b = this.match(len < 0 ? HxOverrides.substr(s,pos,null) : HxOverrides.substr(s,pos,len));
-			if(b) {
-				this.r.s = s;
-				this.r.m.index += pos;
-			}
-			return b;
-		}
-	}
-	,split: function(s) {
-		var d = "#__delim__#";
-		return s.replace(this.r,d).split(d);
-	}
-	,map: function(s,f) {
-		var offset = 0;
-		var buf_b = "";
-		while(true) {
-			if(offset >= s.length) {
-				break;
-			} else if(!this.matchSub(s,offset)) {
-				buf_b += Std.string(HxOverrides.substr(s,offset,null));
-				break;
-			}
-			var p = this.matchedPos();
-			buf_b += Std.string(HxOverrides.substr(s,offset,p.pos - offset));
-			buf_b += Std.string(f(this));
-			if(p.len == 0) {
-				buf_b += Std.string(HxOverrides.substr(s,p.pos,1));
-				offset = p.pos + 1;
-			} else {
-				offset = p.pos + p.len;
-			}
-			if(!this.r.global) {
-				break;
-			}
-		}
-		if(!this.r.global && offset > 0 && offset < s.length) {
-			buf_b += Std.string(HxOverrides.substr(s,offset,null));
-		}
-		return buf_b;
-	}
-	,__class__: EReg
-};
-var HxOverrides = function() { };
-$hxClasses["HxOverrides"] = HxOverrides;
-HxOverrides.__name__ = "HxOverrides";
-HxOverrides.cca = function(s,index) {
-	var x = s.charCodeAt(index);
-	if(x != x) {
-		return undefined;
-	}
-	return x;
-};
-HxOverrides.substr = function(s,pos,len) {
-	if(len == null) {
-		len = s.length;
-	} else if(len < 0) {
-		if(pos == 0) {
-			len = s.length + len;
-		} else {
-			return "";
-		}
-	}
-	return s.substr(pos,len);
-};
-HxOverrides.remove = function(a,obj) {
-	var i = a.indexOf(obj);
-	if(i == -1) {
-		return false;
-	}
-	a.splice(i,1);
-	return true;
-};
-HxOverrides.now = function() {
-	return Date.now();
-};
-var Main = function() { };
-$hxClasses["Main"] = Main;
-Main.__name__ = "Main";
-Main.main = function() {
-	var app = new haxe_ui_HaxeUIApp();
-	app.ready(function() {
-		app.addComponent(new MainView());
-		app.start();
-	});
-};
 var haxe_ui_backend_ComponentSurface = function() {
 };
 $hxClasses["haxe.ui.backend.ComponentSurface"] = haxe_ui_backend_ComponentSurface;
@@ -4416,6 +4290,829 @@ haxe_ui_containers_Box.prototype = $extend(haxe_ui_core_Component.prototype,{
 	,__class__: haxe_ui_containers_Box
 	,__properties__: $extend(haxe_ui_core_Component.prototype.__properties__,{set_icon:"set_icon",get_icon:"get_icon",set_layoutName:"set_layoutName",get_layoutName:"get_layoutName"})
 });
+var haxe_ui_backend_DialogBase = function() {
+	this._buttonsCreated = false;
+	this._dialogParent = null;
+	this._autoSizeDialog = false;
+	this.destroyOnClose = true;
+	this.button = null;
+	this.centerDialog = true;
+	this.buttons = null;
+	this.autoCenterDialog = true;
+	this.modal = true;
+	var _gthis = this;
+	haxe_ui_containers_Box.call(this);
+	this.dialogContainer = new haxe_ui_containers_VBox();
+	this.dialogContainer.set_id("dialog-container");
+	this.dialogContainer.set_styleNames("dialog-container");
+	this.addComponent(this.dialogContainer);
+	this.dialogTitle = new haxe_ui_containers_HBox();
+	this.dialogTitle.set_id("dialog-title");
+	this.dialogTitle.set_styleNames("dialog-title");
+	this.set_dragInitiator(this.dialogTitle);
+	this.dialogContainer.addComponent(this.dialogTitle);
+	this.dialogTitleLabel = new haxe_ui_components_Label();
+	this.dialogTitleLabel.set_id("dialog-title-label");
+	this.dialogTitleLabel.set_styleNames("dialog-title-label");
+	this.dialogTitleLabel.set_text("HaxeUI");
+	this.dialogTitle.addComponent(this.dialogTitleLabel);
+	this.dialogCloseButton = new haxe_ui_components_Image();
+	this.dialogCloseButton.set_id("dialog-close-button");
+	this.dialogCloseButton.set_styleNames("dialog-close-button");
+	this.dialogTitle.addComponent(this.dialogCloseButton);
+	this.dialogContent = new haxe_ui_containers_VBox();
+	this.dialogContent.set_id("dialog-content");
+	this.dialogContent.set_styleNames("dialog-content");
+	this.dialogContent.registerEvent("resize",$bind(this,this.onContentResize));
+	this.dialogContainer.addComponent(this.dialogContent);
+	this.dialogFooterContainer = new haxe_ui_containers_Box();
+	this.dialogFooterContainer.set_id("dialog-footer-container");
+	this.dialogFooterContainer.set_styleNames("dialog-footer-container");
+	this.dialogContainer.addComponent(this.dialogFooterContainer);
+	this.dialogFooter = new haxe_ui_containers_HBox();
+	this.dialogFooter.set_id("dialog-footer");
+	this.dialogFooter.set_styleNames("dialog-footer");
+	this.dialogFooter.registerEvent("resize",$bind(this,this.onFooterResize));
+	this.dialogFooterContainer.addComponent(this.dialogFooter);
+	this.dialogFooterContainer.hide();
+	this.dialogCloseButton.set_onClick(function(e) {
+		_gthis.hideDialog("{{dialog.cancel}}");
+	});
+};
+$hxClasses["haxe.ui.backend.DialogBase"] = haxe_ui_backend_DialogBase;
+haxe_ui_backend_DialogBase.__name__ = "haxe.ui.backend.DialogBase";
+haxe_ui_backend_DialogBase.__super__ = haxe_ui_containers_Box;
+haxe_ui_backend_DialogBase.prototype = $extend(haxe_ui_containers_Box.prototype,{
+	modal: null
+	,autoCenterDialog: null
+	,buttons: null
+	,centerDialog: null
+	,button: null
+	,_overlay: null
+	,dialogContainer: null
+	,dialogTitle: null
+	,dialogTitleLabel: null
+	,dialogCloseButton: null
+	,dialogContent: null
+	,dialogFooterContainer: null
+	,dialogFooter: null
+	,destroyOnClose: null
+	,_autoSizeDialog: null
+	,onReady: function() {
+		haxe_ui_containers_Box.prototype.onReady.call(this);
+		this._autoSizeDialog = this.get_autoWidth();
+	}
+	,_dialogParent: null
+	,get_dialogParent: function() {
+		return this._dialogParent;
+	}
+	,set_dialogParent: function(value) {
+		this._dialogParent = value;
+		return value;
+	}
+	,showDialog: function(modal) {
+		if(modal == null) {
+			modal = true;
+		}
+		this.modal = modal;
+		this.show();
+	}
+	,show: function() {
+		var _gthis = this;
+		this.handleVisibility(false);
+		var dp = this.get_dialogParent();
+		if(this.modal) {
+			this._overlay = new haxe_ui_core_Component();
+			this._overlay.set_id("modal-background");
+			this._overlay.addClass("modal-background");
+			this._overlay.set_percentWidth(this._overlay.set_percentHeight(100));
+			if(dp != null) {
+				dp.addComponent(this._overlay);
+			} else {
+				haxe_ui_core_Screen.get_instance().addComponent(this._overlay);
+			}
+		}
+		this.createButtons();
+		if(dp != null) {
+			dp.addComponent(this);
+		} else {
+			haxe_ui_core_Screen.get_instance().addComponent(this);
+		}
+		this.syncComponentValidation();
+		if(this.get_autoHeight() == false) {
+			this.dialogContainer.set_percentHeight(100);
+			this.dialogContent.set_percentHeight(100);
+		}
+		if(this.centerDialog) {
+			this.centerDialogComponent(js_Boot.__cast(this , haxe_ui_containers_dialogs_Dialog));
+		}
+		haxe_ui_Toolkit.callLater(function() {
+			if(_gthis.centerDialog) {
+				_gthis.centerDialogComponent(js_Boot.__cast(_gthis , haxe_ui_containers_dialogs_Dialog));
+			}
+			haxe_ui_Toolkit.callLater(function() {
+				_gthis.handleVisibility(true);
+			});
+		});
+	}
+	,_buttonsCreated: null
+	,createButtons: function() {
+		if(this._buttonsCreated == true) {
+			return;
+		}
+		if(this.buttons != null) {
+			var _g = 0;
+			var _g1 = haxe_ui_containers_dialogs_DialogButton.toArray(this.buttons);
+			while(_g < _g1.length) {
+				var button = _g1[_g];
+				++_g;
+				var buttonComponent = new haxe_ui_components_Button();
+				buttonComponent.set_id(haxe_ui_containers_dialogs_DialogButton.toString(button));
+				var text = buttonComponent.get_id();
+				buttonComponent.set_text(text);
+				buttonComponent.userData = button;
+				buttonComponent.registerEvent("click",$bind(this,this.onFooterButtonClick));
+				this.addFooterComponent(buttonComponent);
+			}
+			this._buttonsCreated = true;
+		}
+	}
+	,get_closable: function() {
+		return !this.dialogCloseButton.get_hidden();
+	}
+	,set_closable: function(value) {
+		if(value == true) {
+			this.dialogCloseButton.show();
+		} else {
+			this.dialogCloseButton.hide();
+		}
+		return value;
+	}
+	,validateDialog: function(button,fn) {
+		fn(true);
+	}
+	,hide: function() {
+		var _gthis = this;
+		this.validateDialog(this.button,function(result) {
+			if(result == true) {
+				var dp = _gthis.get_dialogParent();
+				var event = new haxe_ui_containers_dialogs_DialogEvent("dialogClosed");
+				event.button = _gthis.button;
+				_gthis.dispatch(event);
+				if(event.canceled == true) {
+					return;
+				}
+				if(_gthis.modal && _gthis._overlay != null) {
+					if(dp != null) {
+						dp.removeComponent(_gthis._overlay);
+					} else {
+						haxe_ui_core_Screen.get_instance().removeComponent(_gthis._overlay);
+					}
+				}
+				if(dp != null) {
+					dp.removeComponent(_gthis,_gthis.destroyOnClose);
+				} else {
+					haxe_ui_core_Screen.get_instance().removeComponent(_gthis,_gthis.destroyOnClose);
+				}
+			}
+		});
+	}
+	,hideDialog: function(button) {
+		this.button = button;
+		this.hide();
+	}
+	,get_title: function() {
+		return this.dialogTitleLabel.get_text();
+	}
+	,set_title: function(value) {
+		this.dialogTitleLabel.set_text(value);
+		return value;
+	}
+	,addComponent: function(child) {
+		if(child.classes.indexOf("dialog-container") != -1) {
+			return haxe_ui_containers_Box.prototype.addComponent.call(this,child);
+		}
+		return this.dialogContent.addComponent(child);
+	}
+	,validateComponentLayout: function() {
+		var b = haxe_ui_containers_Box.prototype.validateComponentLayout.call(this);
+		this.dialogTitle.set_width(this.get_layout().get_innerWidth());
+		if(this._autoSizeDialog == false) {
+			var offset = this.get_layout().get_paddingLeft() + this.get_layout().get_paddingRight();
+			if(this.dialogContent.get_width() != this.get_width() - offset) {
+				this.dialogContent.set_width(this.get_width() - offset);
+			}
+			if(this.dialogFooterContainer.get_width() != this.get_width() - offset) {
+				this.dialogFooterContainer.set_width(this.get_width() - offset);
+			}
+		}
+		return b;
+	}
+	,onDestroy: function() {
+		haxe_ui_containers_Box.prototype.onDestroy.call(this);
+		if(this._overlay != null) {
+			haxe_ui_core_Screen.get_instance().removeComponent(this._overlay);
+			this._overlay = null;
+		}
+	}
+	,onContentResize: function(e) {
+		if(this.dialogFooter.get_width() <= 0 || this.dialogFooterContainer.get_width() <= 0 || this._autoSizeDialog == false) {
+			return;
+		}
+		var cx = Math.max(this.dialogFooter.get_width(),this.dialogContent.get_width());
+		var offset = this.get_layout().get_paddingLeft() + this.get_layout().get_paddingRight();
+		var recenter = false;
+		if(cx > 0 && cx != this.get_width() + offset) {
+			this.set_width(cx + offset);
+			recenter = true;
+		}
+		if(this.dialogFooterContainer.get_width() != this.get_width() - offset) {
+			this.dialogFooterContainer.set_width(this.get_width() - offset);
+		}
+		if(recenter == true && this.autoCenterDialog == true) {
+			this.centerDialogComponent(js_Boot.__cast(this , haxe_ui_containers_dialogs_Dialog),false);
+		}
+	}
+	,onFooterResize: function(e) {
+		if(this.dialogFooter.get_width() <= 0 || this.dialogFooterContainer.get_width() <= 0 || this._autoSizeDialog == false) {
+			return;
+		}
+		var cx = Math.max(this.dialogFooter.get_width(),this.dialogContent.get_width());
+		var offset = this.get_layout().get_paddingLeft() + this.get_layout().get_paddingRight();
+		var recenter = false;
+		if(cx > 0 && cx != this.get_width() + offset) {
+			this.set_width(cx + offset);
+			recenter = true;
+		}
+		if(this.dialogFooterContainer.get_width() != this.get_width() - offset) {
+			this.dialogFooterContainer.set_width(this.get_width() - offset);
+		}
+		if(recenter == true && this.autoCenterDialog == true) {
+			this.centerDialogComponent(js_Boot.__cast(this , haxe_ui_containers_dialogs_Dialog),false);
+		}
+	}
+	,addFooterComponent: function(c) {
+		this.dialogFooterContainer.show();
+		this.dialogFooter.addComponent(c);
+	}
+	,centerDialogComponent: function(dialog,validate) {
+		if(validate == null) {
+			validate = true;
+		}
+		if(validate == true) {
+			dialog.syncComponentValidation();
+		}
+		var dp = this.get_dialogParent();
+		if(dp != null) {
+			if(validate == true) {
+				dp.syncComponentValidation();
+			}
+			var x = dp.get_actualComponentWidth() / 2 - dialog.get_actualComponentWidth() / 2;
+			var y = dp.get_actualComponentHeight() / 2 - dialog.get_actualComponentHeight() / 2;
+			dialog.moveComponent(x,y);
+		} else {
+			var x = haxe_ui_core_Screen.get_instance().get_actualWidth() / 2 - dialog.get_actualComponentWidth() / 2;
+			var y = haxe_ui_core_Screen.get_instance().get_actualHeight() / 2 - dialog.get_actualComponentHeight() / 2;
+			dialog.moveComponent(x,y);
+		}
+	}
+	,onFooterButtonClick: function(event) {
+		this.hideDialog(event.target.userData);
+	}
+	,registerBehaviours: function() {
+		haxe_ui_containers_Box.prototype.registerBehaviours.call(this);
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_containers_Box.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_backend_DialogBase();
+	}
+	,__class__: haxe_ui_backend_DialogBase
+	,__properties__: $extend(haxe_ui_containers_Box.prototype.__properties__,{set_title:"set_title",get_title:"get_title",set_closable:"set_closable",get_closable:"get_closable",set_dialogParent:"set_dialogParent",get_dialogParent:"get_dialogParent"})
+});
+var haxe_ui_containers_dialogs_Dialog = function() {
+	haxe_ui_backend_DialogBase.call(this);
+};
+$hxClasses["haxe.ui.containers.dialogs.Dialog"] = haxe_ui_containers_dialogs_Dialog;
+haxe_ui_containers_dialogs_Dialog.__name__ = "haxe.ui.containers.dialogs.Dialog";
+haxe_ui_containers_dialogs_Dialog.__super__ = haxe_ui_backend_DialogBase;
+haxe_ui_containers_dialogs_Dialog.prototype = $extend(haxe_ui_backend_DialogBase.prototype,{
+	__onDialogClosed: null
+	,onDialogClosed: null
+	,set_onDialogClosed: function(value) {
+		if(this.__onDialogClosed != null) {
+			this.unregisterEvent("dialogClosed",this.__onClick);
+			this.__onDialogClosed = null;
+		}
+		this.registerEvent("dialogClosed",value);
+		this.__onDialogClosed = value;
+		return value;
+	}
+	,registerBehaviours: function() {
+		haxe_ui_backend_DialogBase.prototype.registerBehaviours.call(this);
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_backend_DialogBase.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_containers_dialogs_Dialog();
+	}
+	,__class__: haxe_ui_containers_dialogs_Dialog
+	,__properties__: $extend(haxe_ui_backend_DialogBase.prototype.__properties__,{set_onDialogClosed:"set_onDialogClosed"})
+});
+var CustomDialog = function() {
+	haxe_ui_containers_dialogs_Dialog.call(this);
+	var c0 = new haxe_ui_containers_TabView();
+	c0.set_percentWidth(100.);
+	c0.set_percentHeight(100.);
+	var c1 = new haxe_ui_containers_HBox();
+	c1.set_percentWidth(100.);
+	c1.set_percentHeight(100.);
+	c1.set_text("Notes");
+	var c2 = new haxe_ui_containers_ListView();
+	c2.set_width(200.);
+	c2.set_percentHeight(100.);
+	var ds2 = new haxe_ui_data_ArrayDataSource();
+	ds2.add({ text : "Item 1", id : "item"});
+	ds2.add({ text : "Item 2", id : "item"});
+	ds2.add({ text : "Item 3", id : "item"});
+	ds2.add({ text : "Item 4", id : "item"});
+	ds2.add({ text : "Item 5", id : "item"});
+	ds2.add({ text : "Item 6", id : "item"});
+	ds2.add({ text : "Item 7", id : "item"});
+	ds2.add({ text : "Item 8", id : "item"});
+	ds2.add({ text : "Item 9", id : "item"});
+	ds2.add({ text : "Item 10", id : "item"});
+	ds2.add({ text : "Item 11", id : "item"});
+	ds2.add({ text : "Item 12", id : "item"});
+	ds2.add({ text : "Item 13", id : "item"});
+	ds2.add({ text : "Item 14", id : "item"});
+	ds2.add({ text : "Item 15", id : "item"});
+	c2.set_dataSource(ds2);
+	c1.addComponent(c2);
+	var c3 = new haxe_ui_containers_Grid();
+	c3.set_percentWidth(100.);
+	c3.set_styleString("padding: 5px;");
+	c3.set_columns(2);
+	var c4 = new haxe_ui_components_Label();
+	c4.set_text("First Name");
+	c4.set_verticalAlign("center");
+	c3.addComponent(c4);
+	var c5 = new haxe_ui_components_TextField();
+	c5.set_percentWidth(100.);
+	c3.addComponent(c5);
+	var c6 = new haxe_ui_components_Label();
+	c6.set_text("Last Name");
+	c6.set_verticalAlign("center");
+	c3.addComponent(c6);
+	var c7 = new haxe_ui_components_TextField();
+	c7.set_percentWidth(100.);
+	c3.addComponent(c7);
+	var c8 = new haxe_ui_components_Label();
+	c8.set_text("Sex");
+	c8.set_verticalAlign("center");
+	c3.addComponent(c8);
+	var c9 = new haxe_ui_components_DropDown();
+	c9.set_percentWidth(100.);
+	c9.set_selectedIndex(0);
+	var ds9 = new haxe_ui_data_ArrayDataSource();
+	ds9.add({ text : "Male", id : "item"});
+	ds9.add({ text : "Female", id : "item"});
+	c9.set_dataSource(ds9);
+	c3.addComponent(c9);
+	c1.addComponent(c3);
+	c0.addComponent(c1);
+	var c10 = new haxe_ui_containers_VBox();
+	c10.set_text("Left Arm");
+	c0.addComponent(c10);
+	var c11 = new haxe_ui_containers_VBox();
+	c11.set_text("Right Arm");
+	c0.addComponent(c11);
+	var c12 = new haxe_ui_containers_VBox();
+	c12.set_text("Head");
+	c0.addComponent(c12);
+	var c13 = new haxe_ui_containers_VBox();
+	c13.set_text("Torso");
+	c0.addComponent(c13);
+	var c14 = new haxe_ui_containers_VBox();
+	c14.set_text("Left Leg");
+	c0.addComponent(c14);
+	var c15 = new haxe_ui_containers_VBox();
+	c15.set_text("Right Leg");
+	c0.addComponent(c15);
+	this.addComponent(c0);
+	this.set_height(400.);
+	this.bindingRoot = true;
+	this.set_title("Robot Controller");
+	this.modal = false;
+	var larr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.apply}}").split("|");
+	var rarr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.cancel}}").split("|");
+	var _g = 0;
+	while(_g < rarr.length) {
+		var r = rarr[_g];
+		++_g;
+		if(larr.indexOf(r) == -1) {
+			larr.push(r);
+		}
+	}
+	this.buttons = larr.join("|");
+};
+$hxClasses["CustomDialog"] = CustomDialog;
+CustomDialog.__name__ = "CustomDialog";
+CustomDialog.__super__ = haxe_ui_containers_dialogs_Dialog;
+CustomDialog.prototype = $extend(haxe_ui_containers_dialogs_Dialog.prototype,{
+	registerBehaviours: function() {
+		haxe_ui_containers_dialogs_Dialog.prototype.registerBehaviours.call(this);
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_containers_dialogs_Dialog.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new CustomDialog();
+	}
+	,__class__: CustomDialog
+});
+var DateTools = function() { };
+$hxClasses["DateTools"] = DateTools;
+DateTools.__name__ = "DateTools";
+DateTools.__format_get = function(d,e) {
+	switch(e) {
+	case "%":
+		return "%";
+	case "A":
+		return DateTools.DAY_NAMES[d.getDay()];
+	case "B":
+		return DateTools.MONTH_NAMES[d.getMonth()];
+	case "C":
+		return StringTools.lpad(Std.string(d.getFullYear() / 100 | 0),"0",2);
+	case "D":
+		return DateTools.__format(d,"%m/%d/%y");
+	case "F":
+		return DateTools.__format(d,"%Y-%m-%d");
+	case "I":case "l":
+		var hour = d.getHours() % 12;
+		return StringTools.lpad(Std.string(hour == 0 ? 12 : hour),e == "I" ? "0" : " ",2);
+	case "M":
+		return StringTools.lpad(Std.string(d.getMinutes()),"0",2);
+	case "R":
+		return DateTools.__format(d,"%H:%M");
+	case "S":
+		return StringTools.lpad(Std.string(d.getSeconds()),"0",2);
+	case "T":
+		return DateTools.__format(d,"%H:%M:%S");
+	case "Y":
+		return Std.string(d.getFullYear());
+	case "a":
+		return DateTools.DAY_SHORT_NAMES[d.getDay()];
+	case "b":case "h":
+		return DateTools.MONTH_SHORT_NAMES[d.getMonth()];
+	case "d":
+		return StringTools.lpad(Std.string(d.getDate()),"0",2);
+	case "e":
+		return Std.string(d.getDate());
+	case "H":case "k":
+		return StringTools.lpad(Std.string(d.getHours()),e == "H" ? "0" : " ",2);
+	case "m":
+		return StringTools.lpad(Std.string(d.getMonth() + 1),"0",2);
+	case "n":
+		return "\n";
+	case "p":
+		if(d.getHours() > 11) {
+			return "PM";
+		} else {
+			return "AM";
+		}
+		break;
+	case "r":
+		return DateTools.__format(d,"%I:%M:%S %p");
+	case "s":
+		return Std.string(d.getTime() / 1000 | 0);
+	case "t":
+		return "\t";
+	case "u":
+		var t = d.getDay();
+		if(t == 0) {
+			return "7";
+		} else if(t == null) {
+			return "null";
+		} else {
+			return "" + t;
+		}
+		break;
+	case "w":
+		return Std.string(d.getDay());
+	case "y":
+		return StringTools.lpad(Std.string(d.getFullYear() % 100),"0",2);
+	default:
+		throw new haxe_exceptions_NotImplementedException("Date.format %" + e + "- not implemented yet.",null,{ fileName : "DateTools.hx", lineNumber : 101, className : "DateTools", methodName : "__format_get"});
+	}
+};
+DateTools.__format = function(d,f) {
+	var r_b = "";
+	var p = 0;
+	while(true) {
+		var np = f.indexOf("%",p);
+		if(np < 0) {
+			break;
+		}
+		var len = np - p;
+		r_b += len == null ? HxOverrides.substr(f,p,null) : HxOverrides.substr(f,p,len);
+		r_b += Std.string(DateTools.__format_get(d,HxOverrides.substr(f,np + 1,1)));
+		p = np + 2;
+	}
+	var len = f.length - p;
+	r_b += len == null ? HxOverrides.substr(f,p,null) : HxOverrides.substr(f,p,len);
+	return r_b;
+};
+DateTools.format = function(d,f) {
+	return DateTools.__format(d,f);
+};
+var EReg = function(r,opt) {
+	this.r = new RegExp(r,opt.split("u").join(""));
+};
+$hxClasses["EReg"] = EReg;
+EReg.__name__ = "EReg";
+EReg.prototype = {
+	r: null
+	,match: function(s) {
+		if(this.r.global) {
+			this.r.lastIndex = 0;
+		}
+		this.r.m = this.r.exec(s);
+		this.r.s = s;
+		return this.r.m != null;
+	}
+	,matched: function(n) {
+		if(this.r.m != null && n >= 0 && n < this.r.m.length) {
+			return this.r.m[n];
+		} else {
+			throw haxe_Exception.thrown("EReg::matched");
+		}
+	}
+	,matchedPos: function() {
+		if(this.r.m == null) {
+			throw haxe_Exception.thrown("No string matched");
+		}
+		return { pos : this.r.m.index, len : this.r.m[0].length};
+	}
+	,matchSub: function(s,pos,len) {
+		if(len == null) {
+			len = -1;
+		}
+		if(this.r.global) {
+			this.r.lastIndex = pos;
+			this.r.m = this.r.exec(len < 0 ? s : HxOverrides.substr(s,0,pos + len));
+			var b = this.r.m != null;
+			if(b) {
+				this.r.s = s;
+			}
+			return b;
+		} else {
+			var b = this.match(len < 0 ? HxOverrides.substr(s,pos,null) : HxOverrides.substr(s,pos,len));
+			if(b) {
+				this.r.s = s;
+				this.r.m.index += pos;
+			}
+			return b;
+		}
+	}
+	,split: function(s) {
+		var d = "#__delim__#";
+		return s.replace(this.r,d).split(d);
+	}
+	,map: function(s,f) {
+		var offset = 0;
+		var buf_b = "";
+		while(true) {
+			if(offset >= s.length) {
+				break;
+			} else if(!this.matchSub(s,offset)) {
+				buf_b += Std.string(HxOverrides.substr(s,offset,null));
+				break;
+			}
+			var p = this.matchedPos();
+			buf_b += Std.string(HxOverrides.substr(s,offset,p.pos - offset));
+			buf_b += Std.string(f(this));
+			if(p.len == 0) {
+				buf_b += Std.string(HxOverrides.substr(s,p.pos,1));
+				offset = p.pos + 1;
+			} else {
+				offset = p.pos + p.len;
+			}
+			if(!this.r.global) {
+				break;
+			}
+		}
+		if(!this.r.global && offset > 0 && offset < s.length) {
+			buf_b += Std.string(HxOverrides.substr(s,offset,null));
+		}
+		return buf_b;
+	}
+	,__class__: EReg
+};
+var HxOverrides = function() { };
+$hxClasses["HxOverrides"] = HxOverrides;
+HxOverrides.__name__ = "HxOverrides";
+HxOverrides.dateStr = function(date) {
+	var m = date.getMonth() + 1;
+	var d = date.getDate();
+	var h = date.getHours();
+	var mi = date.getMinutes();
+	var s = date.getSeconds();
+	return date.getFullYear() + "-" + (m < 10 ? "0" + m : "" + m) + "-" + (d < 10 ? "0" + d : "" + d) + " " + (h < 10 ? "0" + h : "" + h) + ":" + (mi < 10 ? "0" + mi : "" + mi) + ":" + (s < 10 ? "0" + s : "" + s);
+};
+HxOverrides.strDate = function(s) {
+	switch(s.length) {
+	case 8:
+		var k = s.split(":");
+		var d = new Date();
+		d["setTime"](0);
+		d["setUTCHours"](k[0]);
+		d["setUTCMinutes"](k[1]);
+		d["setUTCSeconds"](k[2]);
+		return d;
+	case 10:
+		var k = s.split("-");
+		return new Date(k[0],k[1] - 1,k[2],0,0,0);
+	case 19:
+		var k = s.split(" ");
+		var y = k[0].split("-");
+		var t = k[1].split(":");
+		return new Date(y[0],y[1] - 1,y[2],t[0],t[1],t[2]);
+	default:
+		throw haxe_Exception.thrown("Invalid date format : " + s);
+	}
+};
+HxOverrides.cca = function(s,index) {
+	var x = s.charCodeAt(index);
+	if(x != x) {
+		return undefined;
+	}
+	return x;
+};
+HxOverrides.substr = function(s,pos,len) {
+	if(len == null) {
+		len = s.length;
+	} else if(len < 0) {
+		if(pos == 0) {
+			len = s.length + len;
+		} else {
+			return "";
+		}
+	}
+	return s.substr(pos,len);
+};
+HxOverrides.remove = function(a,obj) {
+	var i = a.indexOf(obj);
+	if(i == -1) {
+		return false;
+	}
+	a.splice(i,1);
+	return true;
+};
+HxOverrides.now = function() {
+	return Date.now();
+};
+var Main = function() { };
+$hxClasses["Main"] = Main;
+Main.__name__ = "Main";
+Main.main = function() {
+	var app = new haxe_ui_HaxeUIApp();
+	app.ready(function() {
+		haxe_ui_Toolkit.styleSheet.parse("\r\n            .styled-button {\r\n                background: #79bbff #378de5;\r\n                border: 3px solid #337bc4;\r\n                border-radius:10px;\r\n                padding:10px 25px;\r\n                font-size: 16px;\r\n                color: white;\r\n                filter: drop-shadow(1, 45, #000000, 0.2, 0, 0, 0, 3, false);\r\n\r\n            }\r\n            \r\n            .styled-button:hover {\r\n                background: #add6ff #66a8eb;\r\n            }\r\n            \r\n            .styled-button:down {\r\n                background: #47a3ff #1b75d0;\r\n                border-color: #28619a;\r\n            }\r\n\r\n        ","user");
+		var c0 = new haxe_ui_containers_Box();
+		c0.set_styleSheet(new haxe_ui_styles_StyleSheet());
+		var rootComponent = c0;
+		var c0 = new haxe_ui_containers_Absolute();
+		c0.set_id("box1");
+		c0.set_width(400.);
+		c0.set_height(400.);
+		c0.set_styleString("border: 0px solid #ababab");
+		var c1 = new haxe_ui_containers_Box();
+		c1.set_height(1.);
+		c1.set_percentWidth(100.);
+		c1.set_styleString("background-color: #d9d9d9;");
+		c0.addComponent(c1);
+		var c2 = new haxe_ui_containers_HBox();
+		c2.set_left(540.);
+		c2.set_top(110.);
+		c2.set_percentWidth(100.);
+		var c3 = new haxe_ui_components_Button();
+		c3.set_text("Videos");
+		c3.set_styleNames("styled-button");
+		c3.set_styleString("background-opacity: .1");
+		c2.addComponent(c3);
+		var c4 = new haxe_ui_components_Button();
+		c4.set_text("Social");
+		c4.set_styleNames("styled-button");
+		c4.set_styleString("background-opacity: .1");
+		c2.addComponent(c4);
+		var c5 = new haxe_ui_components_Button();
+		c5.set_text("Sensors");
+		c5.set_styleNames("styled-button");
+		c5.set_styleString("background-opacity: .1");
+		c2.addComponent(c5);
+		var c6 = new haxe_ui_components_Button();
+		c6.set_id("customNonModalDialogButtonRobotics");
+		c6.set_text("Robotics");
+		c6.set_styleNames("styled-button");
+		c6.set_styleString("background-opacity: .1");
+		c2.addComponent(c6);
+		var c7 = new haxe_ui_components_Button();
+		c7.set_text("Toolbox");
+		c7.set_styleNames("styled-button");
+		c7.set_styleString("background-opacity: .1");
+		c2.addComponent(c7);
+		var c8 = new haxe_ui_components_Button();
+		c8.set_text("Guides");
+		c8.set_styleNames("styled-button");
+		c8.set_styleString("background-opacity: .1");
+		c2.addComponent(c8);
+		var c9 = new haxe_ui_components_Button();
+		c9.set_text("About");
+		c9.set_styleNames("styled-button");
+		c9.set_styleString("background-opacity: .1");
+		c2.addComponent(c9);
+		var c10 = new haxe_ui_components_Button();
+		c10.set_text("Hosting");
+		c10.set_styleNames("styled-button");
+		c10.set_styleString("background-opacity: .1");
+		c2.addComponent(c10);
+		c0.addComponent(c2);
+		var c11 = new haxe_ui_containers_Box();
+		c11.set_left(180.);
+		c11.set_top(250.);
+		c11.set_percentWidth(100.);
+		c11.set_percentHeight(100.);
+		c11.set_styleString("background-color: black;border:0px solid blue;background-opacity: .5");
+		c0.addComponent(c11);
+		var c12 = new haxe_ui_containers_Box();
+		c12.set_left(230.);
+		c12.set_top(300.);
+		c12.set_percentWidth(75.);
+		c12.set_percentHeight(75.);
+		c12.set_styleString("background-color: white;border:0px solid green;background-opacity: .1");
+		c0.addComponent(c12);
+		var c13 = new haxe_ui_components_Image();
+		c13.set_left(1630.);
+		c13.set_top(110.);
+		c13.set_width(100.);
+		c13.set_height(100.);
+		c13.set_styleString("border:0px solid #ababab");
+		c13.set_resource(haxe_ui_util_Variant.fromString("haxeui-core/styles/default/haxeui.png"));
+		c0.addComponent(c13);
+		var c14 = new haxe_ui_components_Image();
+		c14.set_left(360.);
+		c14.set_top(430.);
+		c14.set_width(300.);
+		c14.set_height(300.);
+		c14.set_styleString("border:0px solid #ababab");
+		c14.set_resource(haxe_ui_util_Variant.fromString("assets/profile.jpg"));
+		c0.addComponent(c14);
+		rootComponent.addComponent(c0);
+		rootComponent.bindingRoot = true;
+		var main = rootComponent;
+		var customNonModalDialogButtonRobotics = main.findComponent("customNonModalDialogButtonRobotics",haxe_ui_components_Button);
+		customNonModalDialogButtonRobotics.set_onClick(function(e) {
+			var dialog = new CustomDialog();
+			dialog.set_width(800);
+			dialog.show();
+		});
+		app.addComponent(new MainView());
+		app.start();
+	});
+};
 var haxe_ui_containers_VBox = function() {
 	haxe_ui_containers_Box.call(this);
 	this.set_layout(new haxe_ui_layouts_VerticalLayout());
@@ -4447,7 +5144,7 @@ haxe_ui_containers_VBox.prototype = $extend(haxe_ui_containers_Box.prototype,{
 });
 var MainView = function() {
 	haxe_ui_containers_VBox.call(this);
-	haxe_ui_Toolkit.styleSheet.parse("\r\n            .styled-button {\r\n                background: #79bbff #378de5;\r\n                border: 3px solid #337bc4;\r\n                border-radius:10px;\r\n                padding:10px 25px;\r\n                font-size: 16px;\r\n                color: white;\r\n                filter: drop-shadow(1, 45, #000000, 0.2, 0, 0, 0, 3, false);\r\n            }\r\n            \r\n            .styled-button:hover {\r\n                background: #add6ff #66a8eb;\r\n            }\r\n            \r\n            .styled-button:down {\r\n                background: #47a3ff #1b75d0;\r\n                border-color: #28619a;\r\n            }\r\n        ","user");
+	haxe_ui_Toolkit.styleSheet.parse("\r\n            .styled-button {\r\n                background: #79bbff #378de5;\r\n                border: 3px solid #337bc4;\r\n                border-radius:10px;\r\n                padding:10px 25px;\r\n                font-size: 16px;\r\n                color: white;\r\n                filter: drop-shadow(1, 45, #000000, 0.2, 0, 0, 0, 3, false);\r\n\r\n            }\r\n            \r\n            .styled-button:hover {\r\n                background: #add6ff #66a8eb;\r\n            }\r\n            \r\n            .styled-button:down {\r\n                background: #47a3ff #1b75d0;\r\n                border-color: #28619a;\r\n            }\r\n\r\n        ","user");
 	var c0 = new haxe_ui_containers_Absolute();
 	c0.set_id("box1");
 	c0.set_width(400.);
@@ -4468,32 +5165,33 @@ var MainView = function() {
 	c3.set_styleString("background-opacity: .1");
 	c2.addComponent(c3);
 	var c4 = new haxe_ui_components_Button();
-	c4.set_text("Chat");
+	c4.set_text("Social");
 	c4.set_styleNames("styled-button");
 	c4.set_styleString("background-opacity: .1");
 	c2.addComponent(c4);
 	var c5 = new haxe_ui_components_Button();
-	c5.set_text("Social");
+	c5.set_text("Sensors");
 	c5.set_styleNames("styled-button");
 	c5.set_styleString("background-opacity: .1");
 	c2.addComponent(c5);
 	var c6 = new haxe_ui_components_Button();
-	c6.set_text("Sensors");
+	c6.set_id("customNonModalDialogButtonRobotics");
+	c6.set_text("Robotics");
 	c6.set_styleNames("styled-button");
 	c6.set_styleString("background-opacity: .1");
 	c2.addComponent(c6);
 	var c7 = new haxe_ui_components_Button();
-	c7.set_text("Robotics");
+	c7.set_text("Toolbox");
 	c7.set_styleNames("styled-button");
 	c7.set_styleString("background-opacity: .1");
 	c2.addComponent(c7);
 	var c8 = new haxe_ui_components_Button();
-	c8.set_text("Toolbox");
+	c8.set_text("Guides");
 	c8.set_styleNames("styled-button");
 	c8.set_styleString("background-opacity: .1");
 	c2.addComponent(c8);
 	var c9 = new haxe_ui_components_Button();
-	c9.set_text("Guides");
+	c9.set_text("About");
 	c9.set_styleNames("styled-button");
 	c9.set_styleString("background-opacity: .1");
 	c2.addComponent(c9);
@@ -4518,7 +5216,7 @@ var MainView = function() {
 	c12.set_styleString("background-color: white;border:0px solid green;background-opacity: .1");
 	c0.addComponent(c12);
 	var c13 = new haxe_ui_components_Image();
-	c13.set_left(1670.);
+	c13.set_left(1630.);
 	c13.set_top(110.);
 	c13.set_width(100.);
 	c13.set_height(100.);
@@ -4535,6 +5233,7 @@ var MainView = function() {
 	c0.addComponent(c14);
 	this.addComponent(c0);
 	this.bindingRoot = true;
+	this.customNonModalDialogButtonRobotics = c6;
 	this.box1 = c0;
 };
 $hxClasses["MainView"] = MainView;
@@ -4560,6 +5259,7 @@ MainView.prototype = $extend(haxe_ui_containers_VBox.prototype,{
 	,self: function() {
 		return new MainView();
 	}
+	,customNonModalDialogButtonRobotics: null
 	,box1: null
 	,__class__: MainView
 });
@@ -4703,6 +5403,16 @@ StringTools.rtrim = function(s) {
 StringTools.trim = function(s) {
 	return StringTools.ltrim(StringTools.rtrim(s));
 };
+StringTools.lpad = function(s,c,l) {
+	if(c.length <= 0) {
+		return s;
+	}
+	var buf_b = "";
+	l -= s.length;
+	while(buf_b.length < l) buf_b += c == null ? "null" : "" + c;
+	buf_b += s == null ? "null" : "" + s;
+	return buf_b;
+};
 StringTools.replace = function(s,sub,by) {
 	return s.split(sub).join(by);
 };
@@ -4809,11 +5519,17 @@ haxe_Exception.prototype = $extend(Error.prototype,{
 	__skipStack: null
 	,__nativeException: null
 	,__previousException: null
+	,toString: function() {
+		return this.get_message();
+	}
+	,get_message: function() {
+		return this.message;
+	}
 	,get_native: function() {
 		return this.__nativeException;
 	}
 	,__class__: haxe_Exception
-	,__properties__: {get_native:"get_native"}
+	,__properties__: {get_native:"get_native",get_message:"get_message"}
 });
 var haxe_Resource = function() { };
 $hxClasses["haxe.Resource"] = haxe_Resource;
@@ -4868,6 +5584,14 @@ var haxe_Timer = function(time_ms) {
 };
 $hxClasses["haxe.Timer"] = haxe_Timer;
 haxe_Timer.__name__ = "haxe.Timer";
+haxe_Timer.delay = function(f,time_ms) {
+	var t = new haxe_Timer(time_ms);
+	t.run = function() {
+		t.stop();
+		f();
+	};
+	return t;
+};
 haxe_Timer.prototype = {
 	id: null
 	,stop: function() {
@@ -5273,6 +5997,36 @@ haxe_ds__$StringMap_StringMapKeyIterator.prototype = {
 	}
 	,__class__: haxe_ds__$StringMap_StringMapKeyIterator
 };
+var haxe_exceptions_PosException = function(message,previous,pos) {
+	haxe_Exception.call(this,message,previous);
+	if(pos == null) {
+		this.posInfos = { fileName : "(unknown)", lineNumber : 0, className : "(unknown)", methodName : "(unknown)"};
+	} else {
+		this.posInfos = pos;
+	}
+};
+$hxClasses["haxe.exceptions.PosException"] = haxe_exceptions_PosException;
+haxe_exceptions_PosException.__name__ = "haxe.exceptions.PosException";
+haxe_exceptions_PosException.__super__ = haxe_Exception;
+haxe_exceptions_PosException.prototype = $extend(haxe_Exception.prototype,{
+	posInfos: null
+	,toString: function() {
+		return "" + haxe_Exception.prototype.toString.call(this) + " in " + this.posInfos.className + "." + this.posInfos.methodName + " at " + this.posInfos.fileName + ":" + this.posInfos.lineNumber;
+	}
+	,__class__: haxe_exceptions_PosException
+});
+var haxe_exceptions_NotImplementedException = function(message,previous,pos) {
+	if(message == null) {
+		message = "Not implemented";
+	}
+	haxe_exceptions_PosException.call(this,message,previous,pos);
+};
+$hxClasses["haxe.exceptions.NotImplementedException"] = haxe_exceptions_NotImplementedException;
+haxe_exceptions_NotImplementedException.__name__ = "haxe.exceptions.NotImplementedException";
+haxe_exceptions_NotImplementedException.__super__ = haxe_exceptions_PosException;
+haxe_exceptions_NotImplementedException.prototype = $extend(haxe_exceptions_PosException.prototype,{
+	__class__: haxe_exceptions_NotImplementedException
+});
 var haxe_io_Error = $hxEnums["haxe.io.Error"] = { __ename__:true,__constructs__:null
 	,Blocked: {_hx_name:"Blocked",_hx_index:0,__enum__:"haxe.io.Error",toString:$estr}
 	,Overflow: {_hx_name:"Overflow",_hx_index:1,__enum__:"haxe.io.Error",toString:$estr}
@@ -6027,6 +6781,64 @@ haxe_ui_Toolkit.build = function() {
 	haxe_ui_themes_ThemeManager.get_instance().addStyleResource("native","styles/native/main.css",-1);
 	haxe_ui_themes_ThemeManager.get_instance().addStyleResource("global","styles/main.css",-2);
 	haxe_ui_themes_ThemeManager.get_instance().addStyleResource("default","styles/default/main.css",-1);
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/dark/check.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/dark/down_arrow.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/dark/down_arrow_circled.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/dark/down_arrow_square.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/dark/down_arrow_white.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/dark/left_arrow.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/dark/left_arrow_circled.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/dark/left_arrow_white.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/dark/option.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/dark/right_arrow.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/dark/right_arrow_circled.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/dark/right_arrow_square.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/dark/right_arrow_white.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/dark/tiny-close-button.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/dark/up_arrow.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/dark/up_arrow_circled.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/dark/up_arrow_white.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/dark/up_down_arrows.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/blank.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/check.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/collapsed.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/dialogs/cross-circle-small.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/dialogs/cross-circle.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/dialogs/exclamation-small.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/dialogs/exclamation.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/dialogs/information-small.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/dialogs/information.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/dialogs/question-small.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/dialogs/question.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/down_arrow.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/down_arrow_circled.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/down_arrow_square.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/down_arrow_white.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/expanded.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/folder.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/haxeui.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/haxeui_small.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/haxeui_tiny.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/left_arrow.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/left_arrow_circled.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/left_arrow_white.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/option.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/right_arrow.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/right_arrow_circled.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/right_arrow_square.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/right_arrow_white.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/sizer_gripper_horizontal.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/sizer_gripper_vertical.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/small-close-button.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/sortable_arrows.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/sortable_asc.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/sortable_desc.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/tiny-close-button.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/transparent_px.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/up_arrow.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/up_arrow_circled.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/up_arrow_white.png"});
+	haxe_ui_ToolkitAssets.get_instance().preloadList.push({ type : "image", resourceId : "haxeui-core/styles/default/up_down_arrows.png"});
 	haxe_ui_core_TypeMap.addTypeInfo("haxe.ui.core.InteractiveComponent","allowInteraction","Bool");
 	haxe_ui_core_TypeMap.addTypeInfo("haxe.ui.core.ComponentContainer","value","Dynamic");
 	haxe_ui_core_TypeMap.addTypeInfo("haxe.ui.core.ComponentContainer","tooltipRenderer","Component");
@@ -6048,6 +6860,9 @@ haxe_ui_Toolkit.build = function() {
 	haxe_ui_core_TypeMap.addTypeInfo("haxe.ui.components.Image","originalHeight","Float");
 	haxe_ui_core_TypeMap.addTypeInfo("haxe.ui.components.Image","imageVerticalAlign","VerticalAlign");
 	haxe_ui_core_TypeMap.addTypeInfo("haxe.ui.components.Image","imageHorizontalAlign","HorizontalAlign");
+	haxe_ui_core_TypeMap.addTypeInfo("haxe.ui.components.CheckBox","value","Bool");
+	haxe_ui_core_TypeMap.addTypeInfo("haxe.ui.components.CheckBox","text","String");
+	haxe_ui_core_TypeMap.addTypeInfo("haxe.ui.components.CheckBox","selected","Bool");
 	haxe_ui_core_TypeMap.addTypeInfo("haxe.ui.components.Button","value","String");
 	haxe_ui_core_TypeMap.addTypeInfo("haxe.ui.components.Button","toggle","Bool");
 	haxe_ui_core_TypeMap.addTypeInfo("haxe.ui.components.Button","text","String");
@@ -6570,6 +7385,66 @@ haxe_ui_backend_ImageDisplayImpl.prototype = $extend(haxe_ui_backend_ImageBase.p
 		}
 	}
 	,__class__: haxe_ui_backend_ImageDisplayImpl
+});
+var haxe_ui_backend_MessageBoxBase = function() {
+	this._type = null;
+	haxe_ui_containers_dialogs_Dialog.call(this);
+	var hbox = new haxe_ui_containers_HBox();
+	hbox.set_percentWidth(100);
+	hbox.set_styleString("spacing:10px;");
+	this.addComponent(hbox);
+	this.iconImage = new haxe_ui_components_Image();
+	this.iconImage.set_id("iconImage");
+	hbox.addComponent(this.iconImage);
+	this.messageLabel = new haxe_ui_components_Label();
+	this.messageLabel.set_id("messageLabel");
+	this.messageLabel.set_percentWidth(100);
+	hbox.addComponent(this.messageLabel);
+};
+$hxClasses["haxe.ui.backend.MessageBoxBase"] = haxe_ui_backend_MessageBoxBase;
+haxe_ui_backend_MessageBoxBase.__name__ = "haxe.ui.backend.MessageBoxBase";
+haxe_ui_backend_MessageBoxBase.__super__ = haxe_ui_containers_dialogs_Dialog;
+haxe_ui_backend_MessageBoxBase.prototype = $extend(haxe_ui_containers_dialogs_Dialog.prototype,{
+	iconImage: null
+	,messageLabel: null
+	,get_message: function() {
+		return this.messageLabel.get_text();
+	}
+	,set_message: function(value) {
+		this.messageLabel.set_text(value);
+		return value;
+	}
+	,_type: null
+	,get_type: function() {
+		return this._type;
+	}
+	,set_type: function(value) {
+		this._type = haxe_ui_containers_dialogs_MessageBoxType.toString(value);
+		this.iconImage.addClass(this._type);
+		this.addClass(this._type);
+		return value;
+	}
+	,registerBehaviours: function() {
+		haxe_ui_containers_dialogs_Dialog.prototype.registerBehaviours.call(this);
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_containers_dialogs_Dialog.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_backend_MessageBoxBase();
+	}
+	,__class__: haxe_ui_backend_MessageBoxBase
+	,__properties__: $extend(haxe_ui_containers_dialogs_Dialog.prototype.__properties__,{set_type:"set_type",get_type:"get_type",set_message:"set_message",get_message:"get_message"})
 });
 var haxe_ui_backend_PlatformBase = function() {
 };
@@ -8667,6 +9542,25 @@ haxe_ui_behaviours_InvalidatingBehaviour.prototype = $extend(haxe_ui_behaviours_
 	}
 	,__class__: haxe_ui_behaviours_InvalidatingBehaviour
 });
+var haxe_ui_behaviours_LayoutBehaviour = function(component) {
+	haxe_ui_behaviours_ValueBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.behaviours.LayoutBehaviour"] = haxe_ui_behaviours_LayoutBehaviour;
+haxe_ui_behaviours_LayoutBehaviour.__name__ = "haxe.ui.behaviours.LayoutBehaviour";
+haxe_ui_behaviours_LayoutBehaviour.__super__ = haxe_ui_behaviours_ValueBehaviour;
+haxe_ui_behaviours_LayoutBehaviour.prototype = $extend(haxe_ui_behaviours_ValueBehaviour.prototype,{
+	set: function(value) {
+		if(haxe_ui_util_Variant.eq(value,this.get())) {
+			return;
+		}
+		this._value = value;
+		var _this = this._component;
+		if(!(_this._layout == null || _this._layoutLocked == true)) {
+			_this.invalidateComponent("layout",false);
+		}
+	}
+	,__class__: haxe_ui_behaviours_LayoutBehaviour
+});
 var haxe_ui_focus_IFocusable = function() { };
 $hxClasses["haxe.ui.focus.IFocusable"] = haxe_ui_focus_IFocusable;
 haxe_ui_focus_IFocusable.__name__ = "haxe.ui.focus.IFocusable";
@@ -9944,6 +10838,2392 @@ haxe_ui_components_ButtonBuilder.prototype = $extend(haxe_ui_core_CompositeBuild
 	}
 	,__class__: haxe_ui_components_ButtonBuilder
 });
+var haxe_ui_events_UIEvent = function(type,bubble,data) {
+	if(bubble == null) {
+		bubble = false;
+	}
+	this.type = type;
+	this.bubble = bubble;
+	this.data = data;
+	this.canceled = false;
+};
+$hxClasses["haxe.ui.events.UIEvent"] = haxe_ui_events_UIEvent;
+haxe_ui_events_UIEvent.__name__ = "haxe.ui.events.UIEvent";
+haxe_ui_events_UIEvent.__super__ = haxe_ui_backend_EventImpl;
+haxe_ui_events_UIEvent.prototype = $extend(haxe_ui_backend_EventImpl.prototype,{
+	bubble: null
+	,type: null
+	,target: null
+	,data: null
+	,canceled: null
+	,cancel: function() {
+		haxe_ui_backend_EventImpl.prototype.cancel.call(this);
+		this.canceled = true;
+	}
+	,clone: function() {
+		var c = new haxe_ui_events_UIEvent(this.type);
+		c.type = this.type;
+		c.bubble = this.bubble;
+		c.target = this.target;
+		c.data = this.data;
+		c.canceled = this.canceled;
+		this.postClone(c);
+		return c;
+	}
+	,__class__: haxe_ui_events_UIEvent
+});
+var haxe_ui_components_CalendarEvent = function(type,bubble,data) {
+	haxe_ui_events_UIEvent.call(this,type,bubble,data);
+};
+$hxClasses["haxe.ui.components.CalendarEvent"] = haxe_ui_components_CalendarEvent;
+haxe_ui_components_CalendarEvent.__name__ = "haxe.ui.components.CalendarEvent";
+haxe_ui_components_CalendarEvent.__super__ = haxe_ui_events_UIEvent;
+haxe_ui_components_CalendarEvent.prototype = $extend(haxe_ui_events_UIEvent.prototype,{
+	clone: function() {
+		var c = new haxe_ui_components_CalendarEvent(this.type);
+		c.type = this.type;
+		c.bubble = this.bubble;
+		c.target = this.target;
+		c.data = this.data;
+		c.canceled = this.canceled;
+		this.postClone(c);
+		return c;
+	}
+	,__class__: haxe_ui_components_CalendarEvent
+});
+var haxe_ui_containers_Grid = function() {
+	this._columns = -1;
+	haxe_ui_containers_Box.call(this);
+	if(this._columns == -1) {
+		this.set_columns(2);
+	}
+};
+$hxClasses["haxe.ui.containers.Grid"] = haxe_ui_containers_Grid;
+haxe_ui_containers_Grid.__name__ = "haxe.ui.containers.Grid";
+haxe_ui_containers_Grid.__super__ = haxe_ui_containers_Box;
+haxe_ui_containers_Grid.prototype = $extend(haxe_ui_containers_Box.prototype,{
+	_columns: null
+	,get_columns: function() {
+		return (js_Boot.__cast(this._layout , haxe_ui_layouts_VerticalGridLayout)).get_columns();
+	}
+	,set_columns: function(value) {
+		if(this._layout == null) {
+			this.set_layout(this.createLayout());
+		}
+		(js_Boot.__cast(this._layout , haxe_ui_layouts_VerticalGridLayout)).set_columns(value);
+		this._columns = value;
+		return value;
+	}
+	,createDefaults: function() {
+		haxe_ui_containers_Box.prototype.createDefaults.call(this);
+		this._defaultLayoutClass = haxe_ui_layouts_VerticalGridLayout;
+	}
+	,registerBehaviours: function() {
+		haxe_ui_containers_Box.prototype.registerBehaviours.call(this);
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_containers_Box.prototype.cloneComponent.call(this);
+		c.set_columns(this.get_columns());
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_containers_Grid();
+	}
+	,__class__: haxe_ui_containers_Grid
+	,__properties__: $extend(haxe_ui_containers_Box.prototype.__properties__,{set_columns:"set_columns",get_columns:"get_columns"})
+});
+var haxe_ui_components_Calendar = function() {
+	haxe_ui_containers_Grid.call(this);
+};
+$hxClasses["haxe.ui.components.Calendar"] = haxe_ui_components_Calendar;
+haxe_ui_components_Calendar.__name__ = "haxe.ui.components.Calendar";
+haxe_ui_components_Calendar.__super__ = haxe_ui_containers_Grid;
+haxe_ui_components_Calendar.prototype = $extend(haxe_ui_containers_Grid.prototype,{
+	previousMonth: function() {
+		return this.behaviours.call("previousMonth",null);
+	}
+	,nextMonth: function() {
+		return this.behaviours.call("nextMonth",null);
+	}
+	,previousYear: function() {
+		return this.behaviours.call("previousYear",null);
+	}
+	,nextYear: function() {
+		return this.behaviours.call("nextYear",null);
+	}
+	,createDefaults: function() {
+		haxe_ui_containers_Grid.prototype.createDefaults.call(this);
+		this._defaultLayoutClass = haxe_ui_components__$Calendar_Layout;
+	}
+	,registerComposite: function() {
+		haxe_ui_containers_Grid.prototype.registerComposite.call(this);
+		this._internalEventsClass = haxe_ui_components__$Calendar_Events;
+		this._compositeBuilderClass = haxe_ui_components__$Calendar_Builder;
+		this._defaultLayoutClass = haxe_ui_components__$Calendar_Layout;
+	}
+	,registerBehaviours: function() {
+		haxe_ui_containers_Grid.prototype.registerBehaviours.call(this);
+		this.behaviours.register("date",haxe_ui_components__$Calendar_DateBehaviour);
+		this.behaviours.register("selectedDate",haxe_ui_components__$Calendar_SelectedDateBehaviour);
+		this.behaviours.register("previousMonth",haxe_ui_components__$Calendar_PreviousMonthBehaviour);
+		this.behaviours.register("nextMonth",haxe_ui_components__$Calendar_NextMonthBehaviour);
+		this.behaviours.register("previousYear",haxe_ui_components__$Calendar_PreviousYearBehaviour);
+		this.behaviours.register("nextYear",haxe_ui_components__$Calendar_NextYearBehaviour);
+	}
+	,get_date: function() {
+		return haxe_ui_util_Variant.toDate(this.behaviours.get("date"));
+	}
+	,set_date: function(value) {
+		this.behaviours.set("date",haxe_ui_util_Variant.fromDate(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"date"));
+		return value;
+	}
+	,get_selectedDate: function() {
+		return haxe_ui_util_Variant.toDate(this.behaviours.get("selectedDate"));
+	}
+	,set_selectedDate: function(value) {
+		this.behaviours.set("selectedDate",haxe_ui_util_Variant.fromDate(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"selectedDate"));
+		return value;
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_containers_Grid.prototype.cloneComponent.call(this);
+		if(this.get_date() != null) {
+			c.set_date(this.get_date());
+		}
+		if(this.get_selectedDate() != null) {
+			c.set_selectedDate(this.get_selectedDate());
+		}
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_components_Calendar();
+	}
+	,__class__: haxe_ui_components_Calendar
+	,__properties__: $extend(haxe_ui_containers_Grid.prototype.__properties__,{set_selectedDate:"set_selectedDate",get_selectedDate:"get_selectedDate",set_date:"set_date",get_date:"get_date"})
+});
+var haxe_ui_components__$Calendar_PreviousMonthBehaviour = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._Calendar.PreviousMonthBehaviour"] = haxe_ui_components__$Calendar_PreviousMonthBehaviour;
+haxe_ui_components__$Calendar_PreviousMonthBehaviour.__name__ = "haxe.ui.components._Calendar.PreviousMonthBehaviour";
+haxe_ui_components__$Calendar_PreviousMonthBehaviour.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_components__$Calendar_PreviousMonthBehaviour.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	call: function(param) {
+		var calendar = js_Boot.__cast(this._component , haxe_ui_components_Calendar);
+		calendar.set_date(haxe_ui_components__$Calendar_DateUtils.previousMonth(calendar.get_date()));
+		return null;
+	}
+	,__class__: haxe_ui_components__$Calendar_PreviousMonthBehaviour
+});
+var haxe_ui_components__$Calendar_NextMonthBehaviour = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._Calendar.NextMonthBehaviour"] = haxe_ui_components__$Calendar_NextMonthBehaviour;
+haxe_ui_components__$Calendar_NextMonthBehaviour.__name__ = "haxe.ui.components._Calendar.NextMonthBehaviour";
+haxe_ui_components__$Calendar_NextMonthBehaviour.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_components__$Calendar_NextMonthBehaviour.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	call: function(param) {
+		var calendar = js_Boot.__cast(this._component , haxe_ui_components_Calendar);
+		calendar.set_date(haxe_ui_components__$Calendar_DateUtils.nextMonth(calendar.get_date()));
+		return null;
+	}
+	,__class__: haxe_ui_components__$Calendar_NextMonthBehaviour
+});
+var haxe_ui_components__$Calendar_PreviousYearBehaviour = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._Calendar.PreviousYearBehaviour"] = haxe_ui_components__$Calendar_PreviousYearBehaviour;
+haxe_ui_components__$Calendar_PreviousYearBehaviour.__name__ = "haxe.ui.components._Calendar.PreviousYearBehaviour";
+haxe_ui_components__$Calendar_PreviousYearBehaviour.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_components__$Calendar_PreviousYearBehaviour.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	call: function(param) {
+		var calendar = js_Boot.__cast(this._component , haxe_ui_components_Calendar);
+		calendar.set_date(haxe_ui_components__$Calendar_DateUtils.previousYear(calendar.get_date()));
+		return null;
+	}
+	,__class__: haxe_ui_components__$Calendar_PreviousYearBehaviour
+});
+var haxe_ui_components__$Calendar_NextYearBehaviour = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._Calendar.NextYearBehaviour"] = haxe_ui_components__$Calendar_NextYearBehaviour;
+haxe_ui_components__$Calendar_NextYearBehaviour.__name__ = "haxe.ui.components._Calendar.NextYearBehaviour";
+haxe_ui_components__$Calendar_NextYearBehaviour.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_components__$Calendar_NextYearBehaviour.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	call: function(param) {
+		var calendar = js_Boot.__cast(this._component , haxe_ui_components_Calendar);
+		calendar.set_date(haxe_ui_components__$Calendar_DateUtils.nextYear(calendar.get_date()));
+		return null;
+	}
+	,__class__: haxe_ui_components__$Calendar_NextYearBehaviour
+});
+var haxe_ui_components__$Calendar_SelectedDateBehaviour = function(component) {
+	haxe_ui_behaviours_DefaultBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._Calendar.SelectedDateBehaviour"] = haxe_ui_components__$Calendar_SelectedDateBehaviour;
+haxe_ui_components__$Calendar_SelectedDateBehaviour.__name__ = "haxe.ui.components._Calendar.SelectedDateBehaviour";
+haxe_ui_components__$Calendar_SelectedDateBehaviour.__super__ = haxe_ui_behaviours_DefaultBehaviour;
+haxe_ui_components__$Calendar_SelectedDateBehaviour.prototype = $extend(haxe_ui_behaviours_DefaultBehaviour.prototype,{
+	set: function(value) {
+		haxe_ui_behaviours_DefaultBehaviour.prototype.set.call(this,value);
+		var date = haxe_ui_util_Variant.toDate(value);
+		this._component.invalidateComponent("data",false);
+		var calendar = js_Boot.__cast(this._component , haxe_ui_components_Calendar);
+		calendar.set_date(date);
+		this._component.dispatch(new haxe_ui_events_UIEvent("change"));
+	}
+	,__class__: haxe_ui_components__$Calendar_SelectedDateBehaviour
+});
+var haxe_ui_components__$Calendar_DateBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._Calendar.DateBehaviour"] = haxe_ui_components__$Calendar_DateBehaviour;
+haxe_ui_components__$Calendar_DateBehaviour.__name__ = "haxe.ui.components._Calendar.DateBehaviour";
+haxe_ui_components__$Calendar_DateBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_components__$Calendar_DateBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		var date = haxe_ui_util_Variant.toDate(this._value);
+		if(date == null) {
+			return;
+		}
+		var year = date.getFullYear();
+		var month = date.getMonth();
+		var startDay = new Date(year,month,1,0,0,0).getDay();
+		var endDay = haxe_ui_components__$Calendar_DateUtils.getEndDay(month,year);
+		var _g = 0;
+		var _this = this._component;
+		var _g1 = _this._children == null ? [] : _this._children;
+		while(_g < _g1.length) {
+			var child = _g1[_g];
+			++_g;
+			child.set_opacity(.3);
+			child.removeClass("calendar-off-day");
+			child.removeClass("calendar-day");
+			child.removeClass("calendar-day-selected");
+			child.removeClass(":hover");
+		}
+		var prevMonth = haxe_ui_components__$Calendar_DateUtils.previousMonth(date);
+		var last = haxe_ui_components__$Calendar_DateUtils.getEndDay(prevMonth.getMonth(),prevMonth.getFullYear());
+		var n = startDay - 1;
+		var _g = 0;
+		var _g1 = startDay;
+		while(_g < _g1) {
+			var _ = _g++;
+			var _this = this._component;
+			var item = (_this._children == null ? [] : _this._children)[n];
+			item.addClass("calendar-off-day");
+			--n;
+			item.set_text("" + last);
+			--last;
+		}
+		var selectedDate = (js_Boot.__cast(this._component , haxe_ui_components_Calendar)).get_selectedDate();
+		if(selectedDate == null) {
+			selectedDate = new Date();
+		}
+		var _g = 0;
+		var _g1 = endDay;
+		while(_g < _g1) {
+			var i = _g++;
+			var _this = this._component;
+			var item = (_this._children == null ? [] : _this._children)[i + startDay];
+			item.addClass("calendar-day");
+			item.set_opacity(1);
+			item.set_hidden(false);
+			item.set_text("" + (i + 1));
+			if(i + 1 == selectedDate.getDate() && month == selectedDate.getMonth() && year == selectedDate.getFullYear()) {
+				item.addClass("calendar-day-selected");
+			}
+			last = i + startDay;
+		}
+		++last;
+		var n = 0;
+		var _g = last;
+		var _this = this._component;
+		var _g1 = (_this._children == null ? [] : _this._children).length;
+		while(_g < _g1) {
+			var i = _g++;
+			var _this = this._component;
+			var item = (_this._children == null ? [] : _this._children)[i];
+			item.addClass("calendar-off-day");
+			item.set_text("" + (n + 1));
+			++n;
+		}
+		this._component.registerInternalEvents(null,true);
+		this._component.dispatch(new haxe_ui_components_CalendarEvent("datechange"));
+	}
+	,__class__: haxe_ui_components__$Calendar_DateBehaviour
+});
+var haxe_ui_components__$Calendar_DateUtils = function() { };
+$hxClasses["haxe.ui.components._Calendar.DateUtils"] = haxe_ui_components__$Calendar_DateUtils;
+haxe_ui_components__$Calendar_DateUtils.__name__ = "haxe.ui.components._Calendar.DateUtils";
+haxe_ui_components__$Calendar_DateUtils.getEndDay = function(month,year) {
+	var endDay = -1;
+	switch(month) {
+	case 1:
+		if(year % 400 == 0 || year % 100 != 0 && year % 4 == 0) {
+			endDay = 29;
+		} else {
+			endDay = 28;
+		}
+		break;
+	case 3:case 5:case 8:case 10:
+		endDay = 30;
+		break;
+	default:
+		endDay = 31;
+	}
+	return endDay;
+};
+haxe_ui_components__$Calendar_DateUtils.previousMonth = function(date) {
+	var year = date.getFullYear();
+	var month = date.getMonth();
+	var day = date.getDate();
+	--month;
+	if(month < 0) {
+		month = 11;
+		--year;
+	}
+	day = js_Boot.__cast(Math.min(day,haxe_ui_components__$Calendar_DateUtils.getEndDay(month,year)) , Int);
+	date = new Date(year,month,day,0,0,0);
+	return date;
+};
+haxe_ui_components__$Calendar_DateUtils.nextMonth = function(date) {
+	var year = date.getFullYear();
+	var month = date.getMonth();
+	var day = date.getDate();
+	++month;
+	if(month > 11) {
+		month = 0;
+		++year;
+	}
+	day = js_Boot.__cast(Math.min(day,haxe_ui_components__$Calendar_DateUtils.getEndDay(month,year)) , Int);
+	date = new Date(year,month,day,0,0,0);
+	return date;
+};
+haxe_ui_components__$Calendar_DateUtils.previousYear = function(date) {
+	var year = date.getFullYear();
+	var month = date.getMonth();
+	var day = date.getDate();
+	--year;
+	day = js_Boot.__cast(Math.min(day,haxe_ui_components__$Calendar_DateUtils.getEndDay(month,year)) , Int);
+	date = new Date(year,month,day,0,0,0);
+	return date;
+};
+haxe_ui_components__$Calendar_DateUtils.nextYear = function(date) {
+	var year = date.getFullYear();
+	var month = date.getMonth();
+	var day = date.getDate();
+	++year;
+	day = js_Boot.__cast(Math.min(day,haxe_ui_components__$Calendar_DateUtils.getEndDay(month,year)) , Int);
+	date = new Date(year,month,day,0,0,0);
+	return date;
+};
+var haxe_ui_components__$Calendar_Events = function(target) {
+	haxe_ui_events_Events.call(this,target);
+};
+$hxClasses["haxe.ui.components._Calendar.Events"] = haxe_ui_components__$Calendar_Events;
+haxe_ui_components__$Calendar_Events.__name__ = "haxe.ui.components._Calendar.Events";
+haxe_ui_components__$Calendar_Events.__super__ = haxe_ui_events_Events;
+haxe_ui_components__$Calendar_Events.prototype = $extend(haxe_ui_events_Events.prototype,{
+	register: function() {
+		this.unregister();
+		var _g = 0;
+		var _this = this._target;
+		var _g1 = _this._children == null ? [] : _this._children;
+		while(_g < _g1.length) {
+			var child = _g1[_g];
+			++_g;
+			if(child.hasEvent("click",$bind(this,this.onDayClicked)) == false && child.classes.indexOf("calendar-day") != -1) {
+				child.registerEvent("click",$bind(this,this.onDayClicked));
+			}
+		}
+	}
+	,unregister: function() {
+		var _g = 0;
+		var _this = this._target;
+		var _g1 = _this._children == null ? [] : _this._children;
+		while(_g < _g1.length) {
+			var child = _g1[_g];
+			++_g;
+			child.unregisterEvent("click",$bind(this,this.onDayClicked));
+		}
+	}
+	,onDayClicked: function(event) {
+		var calendar = js_Boot.__cast(this._target , haxe_ui_components_Calendar);
+		var day = Std.parseInt(event.target.get_text());
+		var month = calendar.get_date().getMonth();
+		var year = calendar.get_date().getFullYear();
+		calendar.set_selectedDate(new Date(year,month,day,0,0,0));
+	}
+	,__class__: haxe_ui_components__$Calendar_Events
+});
+var haxe_ui_components__$Calendar_Builder = function(calendar) {
+	haxe_ui_core_CompositeBuilder.call(this,calendar);
+	this._calendar = calendar;
+};
+$hxClasses["haxe.ui.components._Calendar.Builder"] = haxe_ui_components__$Calendar_Builder;
+haxe_ui_components__$Calendar_Builder.__name__ = "haxe.ui.components._Calendar.Builder";
+haxe_ui_components__$Calendar_Builder.__super__ = haxe_ui_core_CompositeBuilder;
+haxe_ui_components__$Calendar_Builder.prototype = $extend(haxe_ui_core_CompositeBuilder.prototype,{
+	_calendar: null
+	,create: function() {
+		this._calendar.set_columns(7);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		var item = new haxe_ui_components_Button();
+		item.set_scriptAccess(false);
+		this._calendar.addComponent(item);
+		this._calendar.set_date(new Date());
+	}
+	,__class__: haxe_ui_components__$Calendar_Builder
+});
+var haxe_ui_layouts_VerticalGridLayout = function() {
+	this._columns = 1;
+	haxe_ui_layouts_Layout.call(this);
+};
+$hxClasses["haxe.ui.layouts.VerticalGridLayout"] = haxe_ui_layouts_VerticalGridLayout;
+haxe_ui_layouts_VerticalGridLayout.__name__ = "haxe.ui.layouts.VerticalGridLayout";
+haxe_ui_layouts_VerticalGridLayout.__super__ = haxe_ui_layouts_Layout;
+haxe_ui_layouts_VerticalGridLayout.prototype = $extend(haxe_ui_layouts_Layout.prototype,{
+	_columns: null
+	,get_columns: function() {
+		return this._columns;
+	}
+	,set_columns: function(value) {
+		if(this._columns == value) {
+			return value;
+		}
+		this._columns = value;
+		if(this._component != null) {
+			var _this = this._component;
+			if(!(_this._layout == null || _this._layoutLocked == true)) {
+				_this.invalidateComponent("layout",false);
+			}
+		}
+		return value;
+	}
+	,get_usableSize: function() {
+		var size = haxe_ui_layouts_Layout.prototype.get_usableSize.call(this);
+		var columnWidths = this.calcColumnWidths(size,false);
+		var rowHeights = this.calcRowHeights(size,false);
+		var _g = 0;
+		while(_g < columnWidths.length) {
+			var columnWidth = columnWidths[_g];
+			++_g;
+			size.width -= columnWidth;
+		}
+		var _g = 0;
+		while(_g < rowHeights.length) {
+			var rowHeight = rowHeights[_g];
+			++_g;
+			size.height -= rowHeight;
+		}
+		var _this = this.get_component();
+		if((_this._children == null ? [] : _this._children).length > 1) {
+			var _this = this.get_component();
+			var rows = Math.ceil((_this._children == null ? [] : _this._children).length / this.get_columns());
+			var c = this.get_columns();
+			var _this = this.get_component();
+			var c1 = Math.min(c,(_this._children == null ? [] : _this._children).length);
+			size.width -= this.get_horizontalSpacing() * (c1 - 1);
+			size.height -= this.get_verticalSpacing() * (rows - 1);
+		}
+		if(size.width < 0) {
+			size.width = 0;
+		}
+		if(size.height < 0) {
+			size.height = 0;
+		}
+		return size;
+	}
+	,resizeChildren: function() {
+		var size = this.get_usableSize();
+		var columnWidths = this.calcColumnWidths(size,true);
+		var rowHeights = this.calcRowHeights(size,true);
+		var explicitWidths = this.calcExplicitWidths();
+		var explicitHeights = this.calcExplicitHeights();
+		var rowIndex = 0;
+		var columnIndex = 0;
+		var _g = 0;
+		var _this = this.get_component();
+		var _g1 = _this._children == null ? [] : _this._children;
+		while(_g < _g1.length) {
+			var child = _g1[_g];
+			++_g;
+			if(child.get_includeInLayout() == false) {
+				continue;
+			}
+			var cx = null;
+			var cy = null;
+			if(child.get_percentWidth() != null) {
+				var ucx = columnWidths[columnIndex];
+				if(explicitWidths[columnIndex] == false) {
+					cx = ucx;
+				} else {
+					cx = ucx * child.get_percentWidth() / 100;
+				}
+			}
+			if(child.get_percentHeight() != null) {
+				var ucy = rowHeights[rowIndex];
+				if(explicitHeights[rowIndex] == false) {
+					cy = ucy;
+				} else {
+					cy = ucy * child.get_percentHeight() / 100;
+				}
+			}
+			child.resizeComponent(cx,cy);
+			++columnIndex;
+			if(columnIndex >= this._columns) {
+				columnIndex = 0;
+				++rowIndex;
+			}
+		}
+	}
+	,repositionChildren: function() {
+		var size = this.get_usableSize();
+		var columnWidths = this.calcColumnWidths(size,true);
+		var rowHeights = this.calcRowHeights(size,true);
+		var rowIndex = 0;
+		var columnIndex = 0;
+		var xpos = this.get_paddingLeft();
+		var ypos = this.get_paddingTop();
+		var _g = 0;
+		var _this = this.get_component();
+		var _g1 = _this._children == null ? [] : _this._children;
+		while(_g < _g1.length) {
+			var child = _g1[_g];
+			++_g;
+			if(child.get_includeInLayout() == false) {
+				continue;
+			}
+			var halign = this.horizontalAlign(child);
+			var valign = this.verticalAlign(child);
+			var xposChild = 0;
+			var yposChild = 0;
+			switch(halign) {
+			case "center":
+				xposChild = xpos + (columnWidths[columnIndex] - child.get_componentWidth()) * 0.5 + this.marginLeft(child) - this.marginRight(child);
+				break;
+			case "right":
+				xposChild = xpos + (columnWidths[columnIndex] - child.get_componentWidth()) + this.marginLeft(child) - this.marginRight(child);
+				break;
+			default:
+				xposChild = xpos + this.marginLeft(child) - this.marginRight(child);
+			}
+			switch(valign) {
+			case "bottom":
+				yposChild = ypos + (rowHeights[rowIndex] - child.get_componentHeight()) + this.marginTop(child) - this.marginBottom(child);
+				break;
+			case "center":
+				yposChild = ypos + (rowHeights[rowIndex] - child.get_componentHeight()) * 0.5 + this.marginTop(child) - this.marginBottom(child);
+				break;
+			default:
+				yposChild = ypos + this.marginTop(child) - this.marginBottom(child);
+			}
+			child.moveComponent(xposChild,yposChild);
+			xpos += columnWidths[columnIndex] + this.get_horizontalSpacing();
+			++columnIndex;
+			if(columnIndex >= this.get_columns()) {
+				xpos = this.get_paddingLeft();
+				ypos += rowHeights[rowIndex] + this.get_verticalSpacing();
+				columnIndex = 0;
+				++rowIndex;
+			}
+		}
+	}
+	,calcColumnWidths: function(usableSize,includePercentage) {
+		var columnWidths = [];
+		var _g = 0;
+		var _g1 = this._columns;
+		while(_g < _g1) {
+			var _ = _g++;
+			columnWidths.push(0);
+		}
+		var rowIndex = 0;
+		var columnIndex = 0;
+		var _g = 0;
+		var _this = this.get_component();
+		var _g1 = _this._children == null ? [] : _this._children;
+		while(_g < _g1.length) {
+			var child = _g1[_g];
+			++_g;
+			if(child.get_includeInLayout() == false) {
+				continue;
+			}
+			if(child.get_percentWidth() == null) {
+				if(child.get_componentWidth() > columnWidths[columnIndex]) {
+					columnWidths[columnIndex] = child.get_componentWidth();
+				}
+			}
+			++columnIndex;
+			if(columnIndex >= this._columns) {
+				columnIndex = 0;
+				++rowIndex;
+			}
+		}
+		if(includePercentage) {
+			rowIndex = 0;
+			columnIndex = 0;
+			var fullWidthsCounts = [0];
+			var _g = 0;
+			var _this = this.get_component();
+			var _g1 = _this._children == null ? [] : _this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				if(child.get_includeInLayout() == false) {
+					continue;
+				}
+				if(child.get_percentWidth() != null && child.get_percentWidth() == 100) {
+					fullWidthsCounts[rowIndex]++;
+				}
+				++columnIndex;
+				if(columnIndex >= this._columns) {
+					columnIndex = 0;
+					++rowIndex;
+					fullWidthsCounts.push(0);
+				}
+			}
+			rowIndex = 0;
+			columnIndex = 0;
+			var _g = 0;
+			var _this = this.get_component();
+			var _g1 = _this._children == null ? [] : _this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				if(child.get_includeInLayout() == false) {
+					continue;
+				}
+				if(child.get_percentWidth() != null) {
+					var childPercentWidth = child.get_percentWidth();
+					if(childPercentWidth == 100 && fullWidthsCounts[rowIndex] != 0) {
+						var f = fullWidthsCounts[rowIndex];
+						if(rowIndex > 0 && fullWidthsCounts[rowIndex - 1] != 0) {
+							f = fullWidthsCounts[rowIndex - 1];
+						}
+						childPercentWidth = 100 / f;
+					}
+					var cx = usableSize.width * childPercentWidth / 100;
+					if(cx > columnWidths[columnIndex]) {
+						columnWidths[columnIndex] = cx;
+					}
+				}
+				++columnIndex;
+				if(columnIndex >= this._columns) {
+					columnIndex = 0;
+					++rowIndex;
+				}
+			}
+		}
+		return columnWidths;
+	}
+	,calcRowHeights: function(usableSize,includePercentage) {
+		var _this = this.get_component();
+		var visibleChildren = (_this._children == null ? [] : _this._children).length;
+		var _g = 0;
+		var _this = this.get_component();
+		var _g1 = _this._children == null ? [] : _this._children;
+		while(_g < _g1.length) {
+			var child = _g1[_g];
+			++_g;
+			if(child.get_includeInLayout() == false) {
+				--visibleChildren;
+			}
+		}
+		var rowCount = visibleChildren / this._columns | 0;
+		if(visibleChildren % this._columns != 0) {
+			++rowCount;
+		}
+		var rowHeights = [];
+		var _g = 0;
+		var _g1 = rowCount;
+		while(_g < _g1) {
+			var _ = _g++;
+			rowHeights.push(0);
+		}
+		var rowIndex = 0;
+		var columnIndex = 0;
+		var _g = 0;
+		var _this = this.get_component();
+		var _g1 = _this._children == null ? [] : _this._children;
+		while(_g < _g1.length) {
+			var child = _g1[_g];
+			++_g;
+			if(child.get_includeInLayout() == false) {
+				continue;
+			}
+			if(child.get_percentHeight() == null) {
+				if(child.get_height() > rowHeights[rowIndex]) {
+					rowHeights[rowIndex] = child.get_height();
+				}
+			}
+			++columnIndex;
+			if(columnIndex >= this._columns) {
+				columnIndex = 0;
+				++rowIndex;
+			}
+		}
+		if(includePercentage) {
+			rowIndex = 0;
+			columnIndex = 0;
+			var newRow = true;
+			var fullHeightRowCount = 0;
+			var _g = 0;
+			var _this = this.get_component();
+			var _g1 = _this._children == null ? [] : _this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				if(child.get_includeInLayout() == false) {
+					continue;
+				}
+				if(child.get_percentHeight() != null && child.get_percentHeight() == 100) {
+					if(newRow == true) {
+						newRow = false;
+						++fullHeightRowCount;
+					}
+				}
+				++columnIndex;
+				if(columnIndex >= this._columns) {
+					columnIndex = 0;
+					++rowIndex;
+					newRow = true;
+				}
+			}
+			rowIndex = 0;
+			columnIndex = 0;
+			var _g = 0;
+			var _this = this.get_component();
+			var _g1 = _this._children == null ? [] : _this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				if(child.get_includeInLayout() == false) {
+					continue;
+				}
+				if(child.get_percentHeight() != null) {
+					var childPercentHeight = child.get_percentHeight();
+					if(childPercentHeight == 100 && fullHeightRowCount > 1) {
+						childPercentHeight = 100 / fullHeightRowCount;
+					}
+					var cy = usableSize.height * childPercentHeight / 100;
+					if(cy > rowHeights[rowIndex]) {
+						rowHeights[rowIndex] = cy;
+					} else {
+						var tmp = usableSize.height > rowHeights[rowIndex];
+					}
+				}
+				++columnIndex;
+				if(columnIndex >= this._columns) {
+					columnIndex = 0;
+					++rowIndex;
+				}
+			}
+		}
+		return rowHeights;
+	}
+	,calcExplicitWidths: function() {
+		var explicitWidths = [];
+		var _g = 0;
+		var _g1 = this._columns;
+		while(_g < _g1) {
+			var _ = _g++;
+			explicitWidths.push(false);
+		}
+		var rowIndex = 0;
+		var columnIndex = 0;
+		var _g = 0;
+		var _this = this.get_component();
+		var _g1 = _this._children == null ? [] : _this._children;
+		while(_g < _g1.length) {
+			var child = _g1[_g];
+			++_g;
+			if(child.get_includeInLayout() == false) {
+				continue;
+			}
+			if(child.get_percentWidth() == null && child.get_componentWidth() > 0) {
+				explicitWidths[columnIndex] = true;
+			}
+			++columnIndex;
+			if(columnIndex >= this._columns) {
+				columnIndex = 0;
+				++rowIndex;
+			}
+		}
+		return explicitWidths;
+	}
+	,calcExplicitHeights: function() {
+		var _this = this.get_component();
+		var visibleChildren = (_this._children == null ? [] : _this._children).length;
+		var _g = 0;
+		var _this = this.get_component();
+		var _g1 = _this._children == null ? [] : _this._children;
+		while(_g < _g1.length) {
+			var child = _g1[_g];
+			++_g;
+			if(child.get_includeInLayout() == false) {
+				--visibleChildren;
+			}
+		}
+		var rowCount = visibleChildren / this.get_columns() | 0;
+		if(visibleChildren % this._columns != 0) {
+			++rowCount;
+		}
+		var explicitHeights = [];
+		var _g = 0;
+		var _g1 = rowCount;
+		while(_g < _g1) {
+			var _ = _g++;
+			explicitHeights.push(false);
+		}
+		var rowIndex = 0;
+		var columnIndex = 0;
+		var _g = 0;
+		var _this = this.get_component();
+		var _g1 = _this._children == null ? [] : _this._children;
+		while(_g < _g1.length) {
+			var child = _g1[_g];
+			++_g;
+			if(child.get_includeInLayout() == false) {
+				continue;
+			}
+			if(child.get_percentHeight() == null && child.get_componentHeight() > 0) {
+				explicitHeights[columnIndex % this._columns] = true;
+			}
+			++columnIndex;
+			if(columnIndex >= this._columns) {
+				columnIndex = 0;
+				++rowIndex;
+			}
+		}
+		return explicitHeights;
+	}
+	,__class__: haxe_ui_layouts_VerticalGridLayout
+	,__properties__: $extend(haxe_ui_layouts_Layout.prototype.__properties__,{set_columns:"set_columns",get_columns:"get_columns"})
+});
+var haxe_ui_components__$Calendar_Layout = function() {
+	haxe_ui_layouts_VerticalGridLayout.call(this);
+};
+$hxClasses["haxe.ui.components._Calendar.Layout"] = haxe_ui_components__$Calendar_Layout;
+haxe_ui_components__$Calendar_Layout.__name__ = "haxe.ui.components._Calendar.Layout";
+haxe_ui_components__$Calendar_Layout.__super__ = haxe_ui_layouts_VerticalGridLayout;
+haxe_ui_components__$Calendar_Layout.prototype = $extend(haxe_ui_layouts_VerticalGridLayout.prototype,{
+	resizeChildren: function() {
+		var max = 0;
+		var _g = 0;
+		var _this = this.get_component();
+		var _g1 = _this._children == null ? [] : _this._children;
+		while(_g < _g1.length) {
+			var child = _g1[_g];
+			++_g;
+			if(child.get_layout() == null) {
+				continue;
+			}
+			if(child.get_width() > child.get_layout().get_paddingLeft() + child.get_layout().get_paddingRight() && child.get_width() > max) {
+				max = child.get_width();
+			}
+			if(child.get_width() > child.get_layout().get_paddingTop() + child.get_layout().get_paddingBottom() && child.get_height() > max) {
+				max = child.get_height();
+			}
+		}
+		if(max > 0) {
+			var _g = 0;
+			var _this = this.get_component();
+			var _g1 = _this._children == null ? [] : _this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				child.set_width(max);
+				child.set_height(max);
+			}
+		}
+	}
+	,__class__: haxe_ui_components__$Calendar_Layout
+});
+var haxe_ui_components_CheckBox = function() {
+	haxe_ui_core_InteractiveComponent.call(this);
+};
+$hxClasses["haxe.ui.components.CheckBox"] = haxe_ui_components_CheckBox;
+haxe_ui_components_CheckBox.__name__ = "haxe.ui.components.CheckBox";
+haxe_ui_components_CheckBox.__super__ = haxe_ui_core_InteractiveComponent;
+haxe_ui_components_CheckBox.prototype = $extend(haxe_ui_core_InteractiveComponent.prototype,{
+	registerBehaviours: function() {
+		haxe_ui_core_InteractiveComponent.prototype.registerBehaviours.call(this);
+		this.behaviours.register("text",haxe_ui_components__$CheckBox_TextBehaviour);
+		this.behaviours.register("selected",haxe_ui_components__$CheckBox_SelectedBehaviour);
+	}
+	,get_selected: function() {
+		return haxe_ui_util_Variant.toBool(this.behaviours.get("selected"));
+	}
+	,set_selected: function(value) {
+		this.behaviours.set("selected",haxe_ui_util_Variant.fromBool(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"selected"));
+		return value;
+	}
+	,get_value: function() {
+		return this.get_selected();
+	}
+	,set_value: function(value) {
+		this.set_selected(value);
+		return value;
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_core_InteractiveComponent.prototype.cloneComponent.call(this);
+		c.set_selected(this.get_selected());
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_components_CheckBox();
+	}
+	,registerComposite: function() {
+		haxe_ui_core_InteractiveComponent.prototype.registerComposite.call(this);
+		this._internalEventsClass = haxe_ui_components__$CheckBox_Events;
+		this._compositeBuilderClass = haxe_ui_components_CheckBoxBuilder;
+		this._defaultLayoutClass = haxe_ui_components__$CheckBox_CheckBoxLayout;
+	}
+	,__class__: haxe_ui_components_CheckBox
+	,__properties__: $extend(haxe_ui_core_InteractiveComponent.prototype.__properties__,{set_selected:"set_selected",get_selected:"get_selected"})
+});
+var haxe_ui_components_CheckBoxValue = function() {
+	haxe_ui_core_InteractiveComponent.call(this);
+};
+$hxClasses["haxe.ui.components.CheckBoxValue"] = haxe_ui_components_CheckBoxValue;
+haxe_ui_components_CheckBoxValue.__name__ = "haxe.ui.components.CheckBoxValue";
+haxe_ui_components_CheckBoxValue.__super__ = haxe_ui_core_InteractiveComponent;
+haxe_ui_components_CheckBoxValue.prototype = $extend(haxe_ui_core_InteractiveComponent.prototype,{
+	onReady: function() {
+		this.createIcon();
+	}
+	,applyStyle: function(style) {
+		haxe_ui_core_InteractiveComponent.prototype.applyStyle.call(this,style);
+		var icon = this.findComponent(null,haxe_ui_components_Image);
+		if(icon != null) {
+			icon.set_resource(haxe_ui_util_Variant.fromString(style.icon));
+		}
+	}
+	,createIcon: function() {
+		var icon = this.findComponent(null,haxe_ui_components_Image);
+		if(icon == null && this.parentComponent != null) {
+			icon = new haxe_ui_components_Image();
+			icon.set_id("" + this.parentComponent.get_cssName() + "-icon");
+			icon.addClass("" + this.parentComponent.get_cssName() + "-icon");
+			if(this.get_style() != null && this.get_style().icon != null) {
+				icon.set_resource(haxe_ui_util_Variant.fromString(this.get_style().icon));
+			}
+			this.addComponent(icon);
+		}
+	}
+	,registerBehaviours: function() {
+		haxe_ui_core_InteractiveComponent.prototype.registerBehaviours.call(this);
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_core_InteractiveComponent.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_components_CheckBoxValue();
+	}
+	,__class__: haxe_ui_components_CheckBoxValue
+});
+var haxe_ui_components__$CheckBox_TextBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._CheckBox.TextBehaviour"] = haxe_ui_components__$CheckBox_TextBehaviour;
+haxe_ui_components__$CheckBox_TextBehaviour.__name__ = "haxe.ui.components._CheckBox.TextBehaviour";
+haxe_ui_components__$CheckBox_TextBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_components__$CheckBox_TextBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		var label = this._component.findComponent(null,haxe_ui_components_Label,false);
+		if(label == null) {
+			label = new haxe_ui_components_Label();
+			label.set_id("" + this._component.get_cssName() + "-label");
+			label.addClass("" + this._component.get_cssName() + "-label");
+			label.set_scriptAccess(false);
+			this._component.addComponent(label);
+			var _this = this._component;
+			var force = true;
+			if(force == null) {
+				force = false;
+			}
+			_this.invalidateComponent("style",false);
+			if(force == true) {
+				_this._style = null;
+			}
+		}
+		label.set_text(haxe_ui_util_Variant.toString(this._value));
+	}
+	,__class__: haxe_ui_components__$CheckBox_TextBehaviour
+});
+var haxe_ui_components__$CheckBox_SelectedBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._CheckBox.SelectedBehaviour"] = haxe_ui_components__$CheckBox_SelectedBehaviour;
+haxe_ui_components__$CheckBox_SelectedBehaviour.__name__ = "haxe.ui.components._CheckBox.SelectedBehaviour";
+haxe_ui_components__$CheckBox_SelectedBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_components__$CheckBox_SelectedBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		var valueComponent = this._component.findComponent(null,haxe_ui_components_CheckBoxValue);
+		if(valueComponent == null) {
+			return;
+		}
+		valueComponent.createIcon();
+		if(haxe_ui_util_Variant.eq(this._value,haxe_ui_util_Variant.fromBool(true))) {
+			valueComponent.addClass(":selected");
+		} else {
+			valueComponent.removeClass(":selected");
+		}
+		this._component.dispatch(new haxe_ui_events_UIEvent("change"));
+	}
+	,__class__: haxe_ui_components__$CheckBox_SelectedBehaviour
+});
+var haxe_ui_components__$CheckBox_Events = function(checkbox) {
+	haxe_ui_events_Events.call(this,checkbox);
+	this._checkbox = checkbox;
+};
+$hxClasses["haxe.ui.components._CheckBox.Events"] = haxe_ui_components__$CheckBox_Events;
+haxe_ui_components__$CheckBox_Events.__name__ = "haxe.ui.components._CheckBox.Events";
+haxe_ui_components__$CheckBox_Events.__super__ = haxe_ui_events_Events;
+haxe_ui_components__$CheckBox_Events.prototype = $extend(haxe_ui_events_Events.prototype,{
+	_checkbox: null
+	,register: function() {
+		if(this.hasEvent("mouseover",$bind(this,this.onMouseOver)) == false) {
+			this.registerEvent("mouseover",$bind(this,this.onMouseOver));
+		}
+		if(this.hasEvent("mouseout",$bind(this,this.onMouseOut)) == false) {
+			this.registerEvent("mouseout",$bind(this,this.onMouseOut));
+		}
+		if(this.hasEvent("click",$bind(this,this.onClick)) == false) {
+			this.registerEvent("click",$bind(this,this.onClick));
+		}
+	}
+	,unregister: function() {
+		this.unregisterEvent("mouseover",$bind(this,this.onMouseOver));
+		this.unregisterEvent("mouseout",$bind(this,this.onMouseOut));
+		this.unregisterEvent("click",$bind(this,this.onClick));
+	}
+	,onMouseOver: function(event) {
+		this._target.addClass(":hover");
+		this._target.findComponent(null,haxe_ui_components_CheckBoxValue).addClass(":hover");
+	}
+	,onMouseOut: function(event) {
+		this._target.removeClass(":hover");
+		this._target.findComponent(null,haxe_ui_components_CheckBoxValue).removeClass(":hover");
+	}
+	,onClick: function(event) {
+		this._checkbox.set_selected(!this._checkbox.get_selected());
+	}
+	,__class__: haxe_ui_components__$CheckBox_Events
+});
+var haxe_ui_components_CheckBoxBuilder = function(checkbox) {
+	haxe_ui_core_CompositeBuilder.call(this,checkbox);
+	this._checkbox = checkbox;
+};
+$hxClasses["haxe.ui.components.CheckBoxBuilder"] = haxe_ui_components_CheckBoxBuilder;
+haxe_ui_components_CheckBoxBuilder.__name__ = "haxe.ui.components.CheckBoxBuilder";
+haxe_ui_components_CheckBoxBuilder.__super__ = haxe_ui_core_CompositeBuilder;
+haxe_ui_components_CheckBoxBuilder.prototype = $extend(haxe_ui_core_CompositeBuilder.prototype,{
+	_checkbox: null
+	,create: function() {
+		if(this._checkbox.findComponent(null,haxe_ui_components_CheckBoxValue) == null) {
+			var value = new haxe_ui_components_CheckBoxValue();
+			value.set_id("" + this._checkbox.get_cssName() + "-value");
+			value.addClass("" + this._checkbox.get_cssName() + "-value");
+			value.set_scriptAccess(false);
+			this._checkbox.addComponent(value);
+		}
+	}
+	,applyStyle: function(style) {
+		var label = this._checkbox.findComponent(null,haxe_ui_components_Label);
+		if(label != null && (label.get_customStyle().color != style.color || label.get_customStyle().fontName != style.fontName || label.get_customStyle().fontSize != style.fontSize || label.get_customStyle().cursor != style.cursor)) {
+			label.get_customStyle().color = style.color;
+			label.get_customStyle().fontName = style.fontName;
+			label.get_customStyle().fontSize = style.fontSize;
+			label.get_customStyle().cursor = style.cursor;
+			label.invalidateComponent("style",false);
+		}
+	}
+	,get_cssName: function() {
+		return "checkbox";
+	}
+	,__class__: haxe_ui_components_CheckBoxBuilder
+});
+var haxe_ui_layouts_HorizontalLayout = function() {
+	haxe_ui_layouts_DefaultLayout.call(this);
+	this._calcFullWidths = true;
+};
+$hxClasses["haxe.ui.layouts.HorizontalLayout"] = haxe_ui_layouts_HorizontalLayout;
+haxe_ui_layouts_HorizontalLayout.__name__ = "haxe.ui.layouts.HorizontalLayout";
+haxe_ui_layouts_HorizontalLayout.__super__ = haxe_ui_layouts_DefaultLayout;
+haxe_ui_layouts_HorizontalLayout.prototype = $extend(haxe_ui_layouts_DefaultLayout.prototype,{
+	repositionChildren: function() {
+		var xpos = this.get_paddingLeft();
+		var _g = 0;
+		var _this = this.get_component();
+		var _g1 = _this._children == null ? [] : _this._children;
+		while(_g < _g1.length) {
+			var child = _g1[_g];
+			++_g;
+			if(child.get_includeInLayout() == false) {
+				continue;
+			}
+			var ypos = 0;
+			switch(this.verticalAlign(child)) {
+			case "bottom":
+				if(child.get_componentHeight() < this.get_component().get_componentHeight()) {
+					ypos = this.get_component().get_componentHeight() - (child.get_componentHeight() + this.get_paddingBottom() + this.marginTop(child));
+				}
+				break;
+			case "center":
+				ypos = (this.get_component().get_componentHeight() - child.get_componentHeight()) / 2 + this.marginTop(child) - this.marginBottom(child);
+				break;
+			default:
+				ypos = this.get_paddingTop() + this.marginTop(child);
+			}
+			child.moveComponent(xpos + this.marginLeft(child),ypos);
+			xpos += child.get_componentWidth() + this.get_horizontalSpacing();
+		}
+	}
+	,get_usableSize: function() {
+		var size = haxe_ui_layouts_DefaultLayout.prototype.get_usableSize.call(this);
+		var _this = this.get_component();
+		var visibleChildren = (_this._children == null ? [] : _this._children).length;
+		var _g = 0;
+		var _this = this.get_component();
+		var _g1 = _this._children == null ? [] : _this._children;
+		while(_g < _g1.length) {
+			var child = _g1[_g];
+			++_g;
+			if(child.get_includeInLayout() == false) {
+				--visibleChildren;
+				continue;
+			}
+			if(child.get_componentWidth() > 0 && (child.get_percentWidth() == null || this.fixedMinWidth(child) == true)) {
+				size.width -= child.get_componentWidth() + this.marginLeft(child) + this.marginRight(child);
+			}
+		}
+		if(visibleChildren > 1) {
+			size.width -= this.get_horizontalSpacing() * (visibleChildren - 1);
+		}
+		if(size.width < 0) {
+			size.width = 0;
+		}
+		return size;
+	}
+	,__class__: haxe_ui_layouts_HorizontalLayout
+});
+var haxe_ui_components__$CheckBox_CheckBoxLayout = function() {
+	haxe_ui_layouts_HorizontalLayout.call(this);
+};
+$hxClasses["haxe.ui.components._CheckBox.CheckBoxLayout"] = haxe_ui_components__$CheckBox_CheckBoxLayout;
+haxe_ui_components__$CheckBox_CheckBoxLayout.__name__ = "haxe.ui.components._CheckBox.CheckBoxLayout";
+haxe_ui_components__$CheckBox_CheckBoxLayout.__super__ = haxe_ui_layouts_HorizontalLayout;
+haxe_ui_components__$CheckBox_CheckBoxLayout.prototype = $extend(haxe_ui_layouts_HorizontalLayout.prototype,{
+	repositionChildren: function() {
+		haxe_ui_layouts_HorizontalLayout.prototype.repositionChildren.call(this);
+		var icon = this._component.findComponent(null,haxe_ui_components_Image,true);
+		if(icon != null) {
+			icon.set_left(Math.round(icon.get_left()));
+			icon.set_top(Math.round(icon.get_top()));
+		}
+	}
+	,__class__: haxe_ui_components__$CheckBox_CheckBoxLayout
+});
+var haxe_ui_core_IDataComponent = function() { };
+$hxClasses["haxe.ui.core.IDataComponent"] = haxe_ui_core_IDataComponent;
+haxe_ui_core_IDataComponent.__name__ = "haxe.ui.core.IDataComponent";
+haxe_ui_core_IDataComponent.__isInterface__ = true;
+haxe_ui_core_IDataComponent.prototype = {
+	get_dataSource: null
+	,set_dataSource: null
+	,__class__: haxe_ui_core_IDataComponent
+	,__properties__: {set_dataSource:"set_dataSource",get_dataSource:"get_dataSource"}
+};
+var haxe_ui_components_DropDown = function() {
+	haxe_ui_components_Button.call(this);
+};
+$hxClasses["haxe.ui.components.DropDown"] = haxe_ui_components_DropDown;
+haxe_ui_components_DropDown.__name__ = "haxe.ui.components.DropDown";
+haxe_ui_components_DropDown.__interfaces__ = [haxe_ui_core_IDataComponent];
+haxe_ui_components_DropDown.__super__ = haxe_ui_components_Button;
+haxe_ui_components_DropDown.prototype = $extend(haxe_ui_components_Button.prototype,{
+	hideDropDown: function() {
+		return this.behaviours.call("hideDropDown",null);
+	}
+	,onThemeChanged: function() {
+		haxe_ui_components_Button.prototype.onThemeChanged.call(this);
+		var builder = js_Boot.__cast(this._compositeBuilder , haxe_ui_components_DropDownBuilder);
+		builder.onThemeChanged();
+	}
+	,registerComposite: function() {
+		haxe_ui_components_Button.prototype.registerComposite.call(this);
+		this._internalEventsClass = haxe_ui_components_DropDownEvents;
+		this._compositeBuilderClass = haxe_ui_components_DropDownBuilder;
+	}
+	,registerBehaviours: function() {
+		haxe_ui_components_Button.prototype.registerBehaviours.call(this);
+		this.behaviours.register("handlerStyleNames",haxe_ui_behaviours_DefaultBehaviour);
+		this.behaviours.register("dataSource",haxe_ui_components__$DropDown_DataSourceBehaviour);
+		this.behaviours.register("type",haxe_ui_behaviours_DefaultBehaviour,haxe_ui_util_Variant.fromString("list"));
+		this.behaviours.register("virtual",haxe_ui_behaviours_DefaultBehaviour,haxe_ui_util_Variant.fromBool(false));
+		this.behaviours.register("dropdownWidth",haxe_ui_behaviours_DefaultBehaviour);
+		this.behaviours.register("dropdownHeight",haxe_ui_behaviours_DefaultBehaviour);
+		this.behaviours.register("dropdownSize",haxe_ui_behaviours_DefaultBehaviour);
+		this.behaviours.register("selectedIndex",haxe_ui_components__$DropDown_SelectedIndexBehaviour,haxe_ui_util_Variant.fromInt(-1));
+		this.behaviours.register("selectedItem",haxe_ui_components__$DropDown_SelectedItemBehaviour);
+		this.behaviours.register("hideDropDown",haxe_ui_components__$DropDown_HideDropDown);
+	}
+	,get_handlerStyleNames: function() {
+		return haxe_ui_util_Variant.toString(this.behaviours.get("handlerStyleNames"));
+	}
+	,set_handlerStyleNames: function(value) {
+		var _g = Type.typeof(value);
+		if(_g._hx_index == 6) {
+			if(_g.c == String) {
+				if(value != null && value.indexOf("{{") != -1 && value.indexOf("}}") != -1) {
+					haxe_ui_locale_LocaleManager.get_instance().registerComponent(this,"handlerStyleNames",null,value);
+					return value;
+				}
+			}
+		}
+		this.behaviours.set("handlerStyleNames",haxe_ui_util_Variant.fromString(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"handlerStyleNames"));
+		return value;
+	}
+	,get_dataSource: function() {
+		return haxe_ui_util_Variant.toDataSource(this.behaviours.get("dataSource"));
+	}
+	,set_dataSource: function(value) {
+		this.behaviours.set("dataSource",haxe_ui_util_Variant.fromDataSource(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"dataSource"));
+		return value;
+	}
+	,get_type: function() {
+		return haxe_ui_util_Variant.toString(this.behaviours.get("type"));
+	}
+	,set_type: function(value) {
+		var _g = Type.typeof(value);
+		if(_g._hx_index == 6) {
+			if(_g.c == String) {
+				if(value != null && value.indexOf("{{") != -1 && value.indexOf("}}") != -1) {
+					haxe_ui_locale_LocaleManager.get_instance().registerComponent(this,"type",null,value);
+					return value;
+				}
+			}
+		}
+		this.behaviours.set("type",haxe_ui_util_Variant.fromString(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"type"));
+		return value;
+	}
+	,get_virtual: function() {
+		return haxe_ui_util_Variant.toBool(this.behaviours.get("virtual"));
+	}
+	,set_virtual: function(value) {
+		this.behaviours.set("virtual",haxe_ui_util_Variant.fromBool(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"virtual"));
+		return value;
+	}
+	,get_dropdownWidth: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("dropdownWidth"));
+	}
+	,set_dropdownWidth: function(value) {
+		this.behaviours.set("dropdownWidth",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"dropdownWidth"));
+		return value;
+	}
+	,get_dropdownHeight: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("dropdownHeight"));
+	}
+	,set_dropdownHeight: function(value) {
+		this.behaviours.set("dropdownHeight",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"dropdownHeight"));
+		return value;
+	}
+	,get_dropdownSize: function() {
+		return haxe_ui_util_Variant.toInt(this.behaviours.get("dropdownSize"));
+	}
+	,set_dropdownSize: function(value) {
+		this.behaviours.set("dropdownSize",haxe_ui_util_Variant.fromInt(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"dropdownSize"));
+		return value;
+	}
+	,get_selectedIndex: function() {
+		return haxe_ui_util_Variant.toInt(this.behaviours.get("selectedIndex"));
+	}
+	,set_selectedIndex: function(value) {
+		this.behaviours.set("selectedIndex",haxe_ui_util_Variant.fromInt(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"selectedIndex"));
+		return value;
+	}
+	,get_selectedItem: function() {
+		return this.behaviours.getDynamic("selectedItem");
+	}
+	,set_selectedItem: function(value) {
+		this.behaviours.setDynamic("selectedItem",value);
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"selectedItem"));
+		return value;
+	}
+	,get_value: function() {
+		return this.get_selectedItem();
+	}
+	,set_value: function(value) {
+		this.set_selectedItem(value);
+		return value;
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_components_Button.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_components_DropDown();
+	}
+	,__class__: haxe_ui_components_DropDown
+	,__properties__: $extend(haxe_ui_components_Button.prototype.__properties__,{set_selectedItem:"set_selectedItem",get_selectedItem:"get_selectedItem",set_selectedIndex:"set_selectedIndex",get_selectedIndex:"get_selectedIndex",set_dropdownSize:"set_dropdownSize",get_dropdownSize:"get_dropdownSize",set_dropdownHeight:"set_dropdownHeight",get_dropdownHeight:"get_dropdownHeight",set_dropdownWidth:"set_dropdownWidth",get_dropdownWidth:"get_dropdownWidth",set_virtual:"set_virtual",get_virtual:"get_virtual",set_type:"set_type",get_type:"get_type",set_dataSource:"set_dataSource",get_dataSource:"get_dataSource",set_handlerStyleNames:"set_handlerStyleNames",get_handlerStyleNames:"get_handlerStyleNames"})
+});
+var haxe_ui_components__$DropDown_HideDropDown = function(component) {
+	haxe_ui_behaviours_DefaultBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._DropDown.HideDropDown"] = haxe_ui_components__$DropDown_HideDropDown;
+haxe_ui_components__$DropDown_HideDropDown.__name__ = "haxe.ui.components._DropDown.HideDropDown";
+haxe_ui_components__$DropDown_HideDropDown.__super__ = haxe_ui_behaviours_DefaultBehaviour;
+haxe_ui_components__$DropDown_HideDropDown.prototype = $extend(haxe_ui_behaviours_DefaultBehaviour.prototype,{
+	call: function(param) {
+		var events = js_Boot.__cast(this._component._internalEvents , haxe_ui_components_DropDownEvents);
+		events.hideDropDown();
+		return null;
+	}
+	,__class__: haxe_ui_components__$DropDown_HideDropDown
+});
+var haxe_ui_components__$DropDown_DataSourceBehaviour = function(component) {
+	haxe_ui_behaviours_DefaultBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._DropDown.DataSourceBehaviour"] = haxe_ui_components__$DropDown_DataSourceBehaviour;
+haxe_ui_components__$DropDown_DataSourceBehaviour.__name__ = "haxe.ui.components._DropDown.DataSourceBehaviour";
+haxe_ui_components__$DropDown_DataSourceBehaviour.__super__ = haxe_ui_behaviours_DefaultBehaviour;
+haxe_ui_components__$DropDown_DataSourceBehaviour.prototype = $extend(haxe_ui_behaviours_DefaultBehaviour.prototype,{
+	get: function() {
+		if(this._value == null || haxe_ui_util_Variant.get_isNull(this._value) == true) {
+			this._value = haxe_ui_util_Variant.fromDataSource(new haxe_ui_data_ArrayDataSource());
+		}
+		return this._value;
+	}
+	,set: function(value) {
+		haxe_ui_behaviours_DefaultBehaviour.prototype.set.call(this,value);
+		if(haxe_ui_util_Variant.eq(value,this._value)) {
+			return;
+		}
+		var handler = (js_Boot.__cast(this._component._compositeBuilder , haxe_ui_components_DropDownBuilder)).get_handler();
+		handler.reset();
+		if(this._component.get_text() == null && this._component.get_isReady()) {
+			(js_Boot.__cast(this._component , haxe_ui_components_DropDown)).set_selectedIndex(0);
+		}
+	}
+	,__class__: haxe_ui_components__$DropDown_DataSourceBehaviour
+});
+var haxe_ui_components__$DropDown_SelectedIndexBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._DropDown.SelectedIndexBehaviour"] = haxe_ui_components__$DropDown_SelectedIndexBehaviour;
+haxe_ui_components__$DropDown_SelectedIndexBehaviour.__name__ = "haxe.ui.components._DropDown.SelectedIndexBehaviour";
+haxe_ui_components__$DropDown_SelectedIndexBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_components__$DropDown_SelectedIndexBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		var handler = (js_Boot.__cast(this._component._compositeBuilder , haxe_ui_components_DropDownBuilder)).get_handler();
+		handler.set_selectedIndex(haxe_ui_util_Variant.toInt(this._value));
+	}
+	,get: function() {
+		if(this._component.get_isReady() == false) {
+			return haxe_ui_behaviours_DataBehaviour.prototype.get.call(this);
+		}
+		var handler = (js_Boot.__cast(this._component._compositeBuilder , haxe_ui_components_DropDownBuilder)).get_handler();
+		return haxe_ui_util_Variant.fromInt(handler.get_selectedIndex());
+	}
+	,set: function(value) {
+		if(this._component.get_isReady() == false) {
+			haxe_ui_behaviours_DataBehaviour.prototype.set.call(this,value);
+			return;
+		}
+		if(haxe_ui_util_Variant.eq(value,this.get())) {
+			return;
+		}
+		this._value = value;
+		this.invalidateData();
+		var handler = (js_Boot.__cast(this._component._compositeBuilder , haxe_ui_components_DropDownBuilder)).get_handler();
+		handler.set_selectedIndex(haxe_ui_util_Variant.toInt(this._value));
+	}
+	,__class__: haxe_ui_components__$DropDown_SelectedIndexBehaviour
+});
+var haxe_ui_components__$DropDown_SelectedItemBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._DropDown.SelectedItemBehaviour"] = haxe_ui_components__$DropDown_SelectedItemBehaviour;
+haxe_ui_components__$DropDown_SelectedItemBehaviour.__name__ = "haxe.ui.components._DropDown.SelectedItemBehaviour";
+haxe_ui_components__$DropDown_SelectedItemBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_components__$DropDown_SelectedItemBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		var handler = (js_Boot.__cast(this._component._compositeBuilder , haxe_ui_components_DropDownBuilder)).get_handler();
+		handler.set_selectedItem(this._value);
+	}
+	,getDynamic: function() {
+		var handler = (js_Boot.__cast(this._component._compositeBuilder , haxe_ui_components_DropDownBuilder)).get_handler();
+		return handler.get_selectedItem();
+	}
+	,set: function(value) {
+		if(this._component.get_isReady() == false) {
+			haxe_ui_behaviours_DataBehaviour.prototype.set.call(this,value);
+			return;
+		}
+		if(haxe_ui_util_Variant.toDynamic(value) == this.getDynamic()) {
+			return;
+		}
+		this._value = value;
+		this.invalidateData();
+		var handler = (js_Boot.__cast(this._component._compositeBuilder , haxe_ui_components_DropDownBuilder)).get_handler();
+		handler.set_selectedItem(value);
+	}
+	,__class__: haxe_ui_components__$DropDown_SelectedItemBehaviour
+});
+var haxe_ui_components_IDropDownHandler = function() { };
+$hxClasses["haxe.ui.components.IDropDownHandler"] = haxe_ui_components_IDropDownHandler;
+haxe_ui_components_IDropDownHandler.__name__ = "haxe.ui.components.IDropDownHandler";
+haxe_ui_components_IDropDownHandler.__isInterface__ = true;
+haxe_ui_components_IDropDownHandler.prototype = {
+	get_component: null
+	,get_selectedIndex: null
+	,set_selectedIndex: null
+	,get_selectedItem: null
+	,set_selectedItem: null
+	,component: null
+	,prepare: null
+	,reset: null
+	,applyDefault: null
+	,__class__: haxe_ui_components_IDropDownHandler
+	,__properties__: {set_selectedItem:"set_selectedItem",get_selectedItem:"get_selectedItem",set_selectedIndex:"set_selectedIndex",get_selectedIndex:"get_selectedIndex",get_component:"get_component"}
+};
+var haxe_ui_components_DropDownHandler = function(dropdown) {
+	this._dropdown = dropdown;
+};
+$hxClasses["haxe.ui.components.DropDownHandler"] = haxe_ui_components_DropDownHandler;
+haxe_ui_components_DropDownHandler.__name__ = "haxe.ui.components.DropDownHandler";
+haxe_ui_components_DropDownHandler.__interfaces__ = [haxe_ui_components_IDropDownHandler];
+haxe_ui_components_DropDownHandler.prototype = {
+	_dropdown: null
+	,component: null
+	,get_component: function() {
+		return null;
+	}
+	,prepare: function(wrapper) {
+	}
+	,reset: function() {
+	}
+	,get_selectedIndex: function() {
+		return -1;
+	}
+	,set_selectedIndex: function(value) {
+		return value;
+	}
+	,get_selectedItem: function() {
+		return null;
+	}
+	,set_selectedItem: function(value) {
+		return value;
+	}
+	,applyDefault: function() {
+	}
+	,__class__: haxe_ui_components_DropDownHandler
+	,__properties__: {set_selectedItem:"set_selectedItem",get_selectedItem:"get_selectedItem",set_selectedIndex:"set_selectedIndex",get_selectedIndex:"get_selectedIndex",get_component:"get_component"}
+};
+var haxe_ui_components_ListDropDownHandler = function(dropdown) {
+	this._cachedSelectedItem = null;
+	this._cachedSelectedIndex = -1;
+	haxe_ui_components_DropDownHandler.call(this,dropdown);
+};
+$hxClasses["haxe.ui.components.ListDropDownHandler"] = haxe_ui_components_ListDropDownHandler;
+haxe_ui_components_ListDropDownHandler.__name__ = "haxe.ui.components.ListDropDownHandler";
+haxe_ui_components_ListDropDownHandler.__super__ = haxe_ui_components_DropDownHandler;
+haxe_ui_components_ListDropDownHandler.prototype = $extend(haxe_ui_components_DropDownHandler.prototype,{
+	_listview: null
+	,get_component: function() {
+		this.createListView();
+		return this._listview;
+	}
+	,reset: function() {
+		if(this._listview != null) {
+			this._listview.set_dataSource(this._dropdown.get_dataSource());
+		}
+	}
+	,prepare: function(wrapper) {
+		var itemCount = 4;
+		if(this._dropdown.get_dropdownSize() != null) {
+			itemCount = this._dropdown.get_dropdownSize();
+		}
+		if(this._listview.get_dataSource() != null && this._listview.get_dataSource().get_size() < itemCount) {
+			itemCount = this._listview.get_dataSource().get_size();
+		}
+		if(itemCount > 0 && this._dropdown.get_dropdownHeight() == null) {
+			this._listview.set_itemCount(itemCount);
+		}
+		if(this._dropdown.get_dropdownWidth() == null) {
+			wrapper.syncComponentValidation();
+			this._listview.set_width(this._dropdown.get_width() - (wrapper.get_layout().get_paddingLeft() + wrapper.get_layout().get_paddingRight()));
+		} else {
+			this._listview.set_width(this._dropdown.get_dropdownWidth());
+		}
+		if(this._dropdown.get_dropdownHeight() != null) {
+			this._listview.set_height(this._dropdown.get_dropdownHeight());
+		}
+		var selectedIndex = this._dropdown.get_selectedIndex();
+		if(this._dropdown.get_dataSource() != null && this._dropdown.get_text() != null && selectedIndex < 0) {
+			var text = this._dropdown.get_text();
+			var itemIndex = this.indexOfItem(text);
+			if(itemIndex != -1) {
+				selectedIndex = itemIndex;
+			}
+		}
+		this._listview.unregisterEvent("change",$bind(this,this.onListChange));
+		this._listview.set_selectedIndex(selectedIndex);
+		this._listview.syncComponentValidation();
+		this._listview.registerEvent("change",$bind(this,this.onListChange));
+	}
+	,_cachedSelectedIndex: null
+	,get_selectedIndex: function() {
+		if(this._listview == null) {
+			return this._cachedSelectedIndex;
+		}
+		return this._listview.get_selectedIndex();
+	}
+	,set_selectedIndex: function(value) {
+		if(this._listview != null && this._cachedSelectedIndex != value) {
+			this._cachedSelectedIndex = value;
+			this._listview.set_selectedIndex(value);
+		} else if(this._cachedSelectedIndex != value) {
+			this._cachedSelectedIndex = value;
+			var data = null;
+			if(this._dropdown.get_dataSource() != null && value >= 0 && value < this._dropdown.get_dataSource().get_size()) {
+				data = this._dropdown.get_dataSource().get(value);
+			}
+			this._dropdown.dispatch(new haxe_ui_events_UIEvent("change",false,data));
+		}
+		if(this._dropdown.get_dataSource() != null && value >= 0 && value < this._dropdown.get_dataSource().get_size()) {
+			var data = this._dropdown.get_dataSource().get(value);
+			var text = null;
+			if(Type.typeof(data) == ValueType.TObject) {
+				text = data.text;
+				if(text == null) {
+					text = data.value;
+				}
+			} else {
+				text = Std.string(data);
+			}
+			this._dropdown.set_text(text);
+		}
+		return value;
+	}
+	,indexOfItem: function(text) {
+		var index = -1;
+		if(this._dropdown.get_dataSource() != null) {
+			var _g = 0;
+			var _g1 = this._dropdown.get_dataSource().get_size();
+			while(_g < _g1) {
+				var i = _g++;
+				var item = this._dropdown.get_dataSource().get(i);
+				if(item == text || item.value == text || item.text == text) {
+					index = i;
+				}
+			}
+		}
+		if(index == -1 && this._dropdown.get_dataSource() != null) {
+			var expr = haxe_ui_locale_LocaleManager.get_instance().findBindingExpr(this._dropdown,"text");
+			if(expr != null) {
+				text = expr;
+				var _g = 0;
+				var _g1 = this._dropdown.get_dataSource().get_size();
+				while(_g < _g1) {
+					var i = _g++;
+					var item = this._dropdown.get_dataSource().get(i);
+					if(item == text || item.value == text || item.text == text) {
+						index = i;
+					}
+				}
+			}
+		}
+		return index;
+	}
+	,get_selectedItem: function() {
+		if(this._listview == null) {
+			if(this._cachedSelectedIndex >= 0 && this._cachedSelectedIndex < this._dropdown.get_dataSource().get_size()) {
+				var data = this._dropdown.get_dataSource().get(this._cachedSelectedIndex);
+				return data;
+			} else {
+				return this._cachedSelectedItem;
+			}
+		}
+		return this._listview.get_selectedItem();
+	}
+	,_cachedSelectedItem: null
+	,set_selectedItem: function(value) {
+		var v = value;
+		var index = this.indexOfItem(haxe_ui_util_Variant.toString(v));
+		var tmp;
+		if(index == -1) {
+			switch(v._hx_index) {
+			case 0:
+				var _g = v.s;
+				tmp = true;
+				break;
+			case 1:
+				var _g = v.s;
+				tmp = true;
+				break;
+			default:
+				tmp = false;
+			}
+		} else {
+			tmp = false;
+		}
+		if(tmp) {
+			index = haxe_ui_util_Variant.toInt(v);
+		}
+		this.set_selectedIndex(index);
+		return value;
+	}
+	,createListView: function() {
+		if(this._listview == null) {
+			this._listview = new haxe_ui_containers_ListView();
+			this._listview.set_virtual(this._dropdown.get_virtual());
+			this._listview.set_dataSource(this._dropdown.get_dataSource());
+			if(this._dropdown.get_id() != null) {
+				this._listview.addClass(this._dropdown.get_id() + "-listview");
+				this._listview.set_id(this._dropdown.get_id() + "_listview");
+			}
+		}
+	}
+	,onListChange: function(event) {
+		if(this._listview.get_selectedItem() == null) {
+			return;
+		}
+		var currentHover = this._listview.findComponent(":hover",null,true,"css");
+		if(currentHover != null) {
+			currentHover.removeClass(":hover");
+		}
+		var selectedItem = this._listview.get_selectedItem();
+		var text = null;
+		if(Type.typeof(selectedItem) == ValueType.TObject) {
+			text = this._listview.get_selectedItem().text;
+			if(text == null) {
+				text = this._listview.get_selectedItem().value;
+			}
+		} else {
+			text = Std.string(selectedItem);
+		}
+		this._dropdown.set_text(text);
+		(js_Boot.__cast(this._dropdown._internalEvents , haxe_ui_components_DropDownEvents)).hideDropDown();
+		this._dropdown.dispatch(new haxe_ui_events_UIEvent("change",false,selectedItem));
+	}
+	,applyDefault: function() {
+		var indexToSelect = 0;
+		if(this._cachedSelectedItem != null) {
+			var v = this._cachedSelectedItem;
+			var index = this.indexOfItem(haxe_ui_util_Variant.toString(v));
+			if(index != -1) {
+				indexToSelect = index;
+			}
+		}
+		this._dropdown.set_selectedIndex(indexToSelect);
+	}
+	,__class__: haxe_ui_components_ListDropDownHandler
+});
+var haxe_ui_components_CalendarDropDownHandler = function(dropdown) {
+	this._cachedSelectedDate = null;
+	haxe_ui_components_DropDownHandler.call(this,dropdown);
+};
+$hxClasses["haxe.ui.components.CalendarDropDownHandler"] = haxe_ui_components_CalendarDropDownHandler;
+haxe_ui_components_CalendarDropDownHandler.__name__ = "haxe.ui.components.CalendarDropDownHandler";
+haxe_ui_components_CalendarDropDownHandler.__super__ = haxe_ui_components_DropDownHandler;
+haxe_ui_components_CalendarDropDownHandler.prototype = $extend(haxe_ui_components_DropDownHandler.prototype,{
+	_calendar: null
+	,get_component: function() {
+		if(this._calendar == null) {
+			this._calendar = new haxe_ui_containers_CalendarView();
+			if(this._dropdown.get_id() != null) {
+				this._calendar.addClass(this._dropdown.get_id() + "-calendar");
+				this._calendar.set_id(this._dropdown.get_id() + "_calendar");
+			}
+			this._calendar.registerEvent("change",$bind(this,this.onCalendarChange));
+		}
+		return this._calendar;
+	}
+	,prepare: function(wrapper) {
+		if(this._dropdown.get_dropdownWidth() != null) {
+			this._calendar.set_width(this._dropdown.get_dropdownWidth());
+		}
+		if(this._dropdown.get_dropdownHeight() != null) {
+			this._calendar.set_height(this._dropdown.get_dropdownHeight());
+		}
+		if(this._cachedSelectedDate != null) {
+			this._calendar.unregisterEvent("change",$bind(this,this.onCalendarChange));
+			this._calendar.set_selectedDate(this._cachedSelectedDate);
+			this._calendar.registerEvent("change",$bind(this,this.onCalendarChange));
+		}
+		this._calendar.syncComponentValidation();
+	}
+	,_cachedSelectedDate: null
+	,get_selectedItem: function() {
+		if(this._calendar == null) {
+			return this._cachedSelectedDate;
+		}
+		return this._calendar.get_selectedDate();
+	}
+	,set_selectedItem: function(value) {
+		if(value == null) {
+			return value;
+		}
+		var v = value;
+		var date = null;
+		if(haxe_ui_util_Variant.get_isString(v) == true) {
+			date = HxOverrides.strDate(haxe_ui_util_Variant.toString(v));
+		} else if(haxe_ui_util_Variant.get_isDate(v)) {
+			date = haxe_ui_util_Variant.toDate(v);
+		}
+		if(this._calendar != null && date != null) {
+			if(HxOverrides.dateStr(date) == HxOverrides.dateStr(this._calendar.get_selectedDate())) {
+				this._dropdown.set_text(DateTools.format(date,haxe_ui_components_CalendarDropDownHandler.DATE_FORMAT));
+				return value;
+			}
+			this._cachedSelectedDate = date;
+			this._calendar.set_selectedDate(date);
+		} else if(date != null) {
+			this._cachedSelectedDate = date;
+			this._dropdown.set_text(DateTools.format(this._cachedSelectedDate,haxe_ui_components_CalendarDropDownHandler.DATE_FORMAT));
+		}
+		return value;
+	}
+	,onCalendarChange: function(event) {
+		if(this._calendar.get_selectedDate() == null) {
+			return;
+		}
+		this._cachedSelectedDate = this._calendar.get_selectedDate();
+		this._dropdown.set_text(DateTools.format(this._calendar.get_selectedDate(),haxe_ui_components_CalendarDropDownHandler.DATE_FORMAT));
+		(js_Boot.__cast(this._dropdown._internalEvents , haxe_ui_components_DropDownEvents)).hideDropDown();
+		this._dropdown.dispatch(new haxe_ui_events_UIEvent("change",false,this._calendar.get_selectedDate()));
+	}
+	,applyDefault: function() {
+		var now = new Date();
+		this._dropdown.set_selectedItem(now);
+	}
+	,__class__: haxe_ui_components_CalendarDropDownHandler
+});
+var haxe_ui_components_DropDownEvents = function(dropdown) {
+	this._wrapper = null;
+	this._overlay = null;
+	haxe_ui_components_ButtonEvents.call(this,dropdown);
+	this._dropdown = dropdown;
+};
+$hxClasses["haxe.ui.components.DropDownEvents"] = haxe_ui_components_DropDownEvents;
+haxe_ui_components_DropDownEvents.__name__ = "haxe.ui.components.DropDownEvents";
+haxe_ui_components_DropDownEvents.__super__ = haxe_ui_components_ButtonEvents;
+haxe_ui_components_DropDownEvents.prototype = $extend(haxe_ui_components_ButtonEvents.prototype,{
+	_dropdown: null
+	,register: function() {
+		haxe_ui_components_ButtonEvents.prototype.register.call(this);
+		this.registerEvent("mousedown",$bind(this,this.onClick));
+	}
+	,unregister: function() {
+		haxe_ui_components_ButtonEvents.prototype.unregister.call(this);
+		this.unregisterEvent("mousedown",$bind(this,this.onClick));
+	}
+	,onClick: function(event) {
+		this._dropdown.set_selected(!this._dropdown.get_selected());
+		if(this._dropdown.get_selected() == true) {
+			this.showDropDown();
+		} else {
+			this.hideDropDown();
+		}
+	}
+	,onMouseClick: function(event) {
+	}
+	,_overlay: null
+	,_wrapper: null
+	,showDropDown: function() {
+		var handler = (js_Boot.__cast(this._dropdown._compositeBuilder , haxe_ui_components_DropDownBuilder)).get_handler();
+		if(handler == null) {
+			return;
+		}
+		if(this._wrapper == null) {
+			this._wrapper = new haxe_ui_containers_Box();
+			this._wrapper.addClass("popup");
+			this._wrapper.addClass("dropdown-popup");
+			if(this._button.get_id() != null) {
+				this._wrapper.addClass(this._button.get_id() + "-popup");
+				this._wrapper.set_id(this._button.get_id() + "_popup");
+			}
+			this._wrapper.set_styleNames(this._dropdown.get_handlerStyleNames());
+			this._wrapper.addComponent(handler.get_component());
+			var filler = new haxe_ui_core_Component();
+			filler.set_horizontalAlign("right");
+			filler.set_includeInLayout(false);
+			filler.addClass("dropdown-filler");
+			filler.set_id("dropdown-filler");
+			this._wrapper.addComponent(filler);
+		}
+		var componentOffset = this._dropdown.getComponentOffset();
+		if(this._dropdown.get_style().mode != null && this._dropdown.get_style().mode == "mobile") {
+			if(this._overlay == null) {
+				this._overlay = new haxe_ui_core_Component();
+				this._overlay.set_id("modal-background");
+				this._overlay.addClass("modal-background");
+				this._overlay.set_percentWidth(this._overlay.set_percentHeight(100));
+			}
+			haxe_ui_core_Screen.get_instance().addComponent(this._overlay);
+			handler.prepare(this._wrapper);
+			haxe_ui_core_Screen.get_instance().addComponent(this._wrapper);
+			this._wrapper.set_left(haxe_ui_core_Screen.get_instance().get_actualWidth() / 2 - this._wrapper.get_actualComponentWidth() / 2);
+			this._wrapper.set_top(haxe_ui_core_Screen.get_instance().get_actualHeight() / 2 - this._wrapper.get_actualComponentHeight() / 2);
+		} else {
+			this._wrapper.set_left(this._dropdown.get_screenLeft() + componentOffset.x);
+			this._wrapper.set_top(this._dropdown.get_screenTop() + (this._dropdown.get_actualComponentHeight() - haxe_ui_Toolkit.get_scaleY()) + componentOffset.y);
+			haxe_ui_core_Screen.get_instance().addComponent(this._wrapper);
+			handler.prepare(this._wrapper);
+			this._wrapper.syncComponentValidation();
+			var cx = this._wrapper.get_width() - this._dropdown.get_width();
+			var filler = this._wrapper.findComponent("dropdown-filler",null,false);
+			if(cx > 0 && filler != null) {
+				this._wrapper.addClass("dropdown-popup-expanded");
+				cx += 2;
+				filler.set_width(cx);
+				filler.set_left(this._wrapper.get_width() - cx);
+				filler.set_hidden(false);
+			} else if(filler != null) {
+				filler.set_hidden(true);
+				this._wrapper.removeClass("dropdown-popup-expanded");
+			}
+			if(this._wrapper.get_screenLeft() + this._wrapper.get_actualComponentWidth() > haxe_ui_core_Screen.get_instance().get_actualWidth()) {
+				this._wrapper.set_left(this._wrapper.get_screenLeft() - this._wrapper.get_actualComponentWidth() + this._dropdown.get_actualComponentWidth());
+			}
+			if(this._wrapper.get_screenTop() + this._wrapper.get_actualComponentHeight() > haxe_ui_core_Screen.get_instance().get_actualHeight()) {
+				this._wrapper.set_top(this._dropdown.get_screenTop() - this._wrapper.get_actualComponentHeight());
+			}
+		}
+		haxe_ui_core_Screen.get_instance().registerEvent("mousedown",$bind(this,this.onScreenMouseDown));
+		haxe_ui_core_Screen.get_instance().registerEvent("rightmousedown",$bind(this,this.onScreenMouseDown));
+	}
+	,hideDropDown: function() {
+		var handler = (js_Boot.__cast(this._dropdown._compositeBuilder , haxe_ui_components_DropDownBuilder)).get_handler();
+		if(handler == null) {
+			return;
+		}
+		if(this._overlay != null) {
+			haxe_ui_core_Screen.get_instance().removeComponent(this._overlay);
+			this._overlay = null;
+		}
+		this._dropdown.set_selected(false);
+		if(this._wrapper != null) {
+			haxe_ui_core_Screen.get_instance().removeComponent(this._wrapper,false);
+		}
+		haxe_ui_core_Screen.get_instance().unregisterEvent("mousedown",$bind(this,this.onScreenMouseDown));
+		haxe_ui_core_Screen.get_instance().unregisterEvent("rightmousedown",$bind(this,this.onScreenMouseDown));
+	}
+	,onScreenMouseDown: function(event) {
+		var handler = (js_Boot.__cast(this._dropdown._compositeBuilder , haxe_ui_components_DropDownBuilder)).get_handler();
+		if(handler.get_component().hitTest(event.screenX,event.screenY) == true) {
+			return;
+		}
+		var componentOffset = this._dropdown.getComponentOffset();
+		if(this._dropdown.hitTest(event.screenX - componentOffset.x,event.screenY - componentOffset.y) == true) {
+			return;
+		}
+		this.hideDropDown();
+	}
+	,dispatchChanged: function() {
+	}
+	,__class__: haxe_ui_components_DropDownEvents
+});
+var haxe_ui_components_DropDownBuilder = function(dropdown) {
+	haxe_ui_components_ButtonBuilder.call(this,dropdown);
+	this._dropdown = dropdown;
+	var this1 = haxe_ui_components_DropDownBuilder.HANDLER_MAP;
+	var value = haxe_ui_components_ListDropDownHandler.__name__;
+	this1.h["list"] = value;
+	var this1 = haxe_ui_components_DropDownBuilder.HANDLER_MAP;
+	var value = haxe_ui_components_CalendarDropDownHandler.__name__;
+	this1.h["date"] = value;
+};
+$hxClasses["haxe.ui.components.DropDownBuilder"] = haxe_ui_components_DropDownBuilder;
+haxe_ui_components_DropDownBuilder.__name__ = "haxe.ui.components.DropDownBuilder";
+haxe_ui_components_DropDownBuilder.__super__ = haxe_ui_components_ButtonBuilder;
+haxe_ui_components_DropDownBuilder.prototype = $extend(haxe_ui_components_ButtonBuilder.prototype,{
+	_dropdown: null
+	,_handler: null
+	,handler: null
+	,get_handler: function() {
+		if(this._handler == null) {
+			var this1 = haxe_ui_components_DropDownBuilder.HANDLER_MAP;
+			var key = this._dropdown.get_type();
+			var handlerClass = this1.h[key];
+			if(handlerClass == null) {
+				handlerClass = this._dropdown.get_type();
+			}
+			this._handler = Type.createInstance($hxClasses[handlerClass],[this._dropdown]);
+		}
+		return this._handler;
+	}
+	,onReady: function() {
+		haxe_ui_components_ButtonBuilder.prototype.onReady.call(this);
+		if(this._dropdown.get_text() == null) {
+			this.get_handler().applyDefault();
+		}
+	}
+	,create: function() {
+		this._dropdown.set_toggle(true);
+	}
+	,destroy: function() {
+		var events = js_Boot.__cast(this._dropdown._internalEvents , haxe_ui_components_DropDownEvents);
+		events.hideDropDown();
+		if(events._wrapper != null) {
+			haxe_ui_core_Screen.get_instance().removeComponent(events._wrapper);
+			events._wrapper = null;
+		}
+	}
+	,onThemeChanged: function() {
+		if(this._handler != null) {
+			haxe_ui_core_Screen.get_instance().invalidateChildren(this._handler.get_component());
+			haxe_ui_core_Screen.get_instance().onThemeChangedChildren(this._handler.get_component());
+		}
+	}
+	,__class__: haxe_ui_components_DropDownBuilder
+	,__properties__: $extend(haxe_ui_components_ButtonBuilder.prototype.__properties__,{get_handler:"get_handler"})
+});
+var haxe_ui_core_IDirectionalComponent = function() { };
+$hxClasses["haxe.ui.core.IDirectionalComponent"] = haxe_ui_core_IDirectionalComponent;
+haxe_ui_core_IDirectionalComponent.__name__ = "haxe.ui.core.IDirectionalComponent";
+haxe_ui_core_IDirectionalComponent.__isInterface__ = true;
+var haxe_ui_components_Scroll = function() {
+	haxe_ui_core_InteractiveComponent.call(this);
+};
+$hxClasses["haxe.ui.components.Scroll"] = haxe_ui_components_Scroll;
+haxe_ui_components_Scroll.__name__ = "haxe.ui.components.Scroll";
+haxe_ui_components_Scroll.__interfaces__ = [haxe_ui_core_IDirectionalComponent];
+haxe_ui_components_Scroll.__super__ = haxe_ui_core_InteractiveComponent;
+haxe_ui_components_Scroll.prototype = $extend(haxe_ui_core_InteractiveComponent.prototype,{
+	posFromCoord: function(coord) {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.call("posFromCoord",coord));
+	}
+	,applyPageFromCoord: function(coord) {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.call("applyPageFromCoord",coord));
+	}
+	,createChildren: function() {
+		this.createButton("deinc",true).set_repeater(true);
+		this.createButton("inc",true).set_repeater(true);
+		this.createButton("thumb").set_remainPressed(true);
+		this.registerInternalEvents(haxe_ui_components__$Scroll_Events);
+	}
+	,createButton: function(type,hidden) {
+		if(hidden == null) {
+			hidden = false;
+		}
+		var b = this.findComponent("scroll-" + type + "-button",haxe_ui_components_Button);
+		if(b == null) {
+			b = new haxe_ui_components_Button();
+			b.set_hidden(hidden);
+			b.set_scriptAccess(false);
+			b.get_customStyle().native = false;
+			b.set_id("scroll-" + type + "-button");
+			b.addClass(type);
+			b.set_allowFocus(false);
+			this.addComponent(b);
+		}
+		return b;
+	}
+	,registerBehaviours: function() {
+		haxe_ui_core_InteractiveComponent.prototype.registerBehaviours.call(this);
+		this.behaviours.register("min",haxe_ui_components__$Scroll_ScrollValueBehaviour,haxe_ui_util_Variant.fromInt(0));
+		this.behaviours.register("max",haxe_ui_components__$Scroll_ScrollValueBehaviour,haxe_ui_util_Variant.fromInt(100));
+		this.behaviours.register("pageSize",haxe_ui_behaviours_LayoutBehaviour,haxe_ui_util_Variant.fromInt(0));
+		this.behaviours.register("pos",haxe_ui_components__$Scroll_ScrollValueBehaviour,haxe_ui_util_Variant.fromInt(0));
+		this.behaviours.register("increment",haxe_ui_behaviours_DefaultBehaviour,haxe_ui_util_Variant.fromInt(20));
+	}
+	,get_min: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("min"));
+	}
+	,set_min: function(value) {
+		this.behaviours.set("min",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"min"));
+		return value;
+	}
+	,get_max: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("max"));
+	}
+	,set_max: function(value) {
+		this.behaviours.set("max",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"max"));
+		return value;
+	}
+	,get_pageSize: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("pageSize"));
+	}
+	,set_pageSize: function(value) {
+		this.behaviours.set("pageSize",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"pageSize"));
+		return value;
+	}
+	,get_pos: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("pos"));
+	}
+	,set_pos: function(value) {
+		this.behaviours.set("pos",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"pos"));
+		return value;
+	}
+	,get_increment: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("increment"));
+	}
+	,set_increment: function(value) {
+		this.behaviours.set("increment",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"increment"));
+		return value;
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_core_InteractiveComponent.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_components_Scroll();
+	}
+	,__class__: haxe_ui_components_Scroll
+	,__properties__: $extend(haxe_ui_core_InteractiveComponent.prototype.__properties__,{set_increment:"set_increment",get_increment:"get_increment",set_pos:"set_pos",get_pos:"get_pos",set_pageSize:"set_pageSize",get_pageSize:"get_pageSize",set_max:"set_max",get_max:"get_max",set_min:"set_min",get_min:"get_min"})
+});
+var haxe_ui_components_HorizontalScroll = function() {
+	haxe_ui_components_Scroll.call(this);
+};
+$hxClasses["haxe.ui.components.HorizontalScroll"] = haxe_ui_components_HorizontalScroll;
+haxe_ui_components_HorizontalScroll.__name__ = "haxe.ui.components.HorizontalScroll";
+haxe_ui_components_HorizontalScroll.__super__ = haxe_ui_components_Scroll;
+haxe_ui_components_HorizontalScroll.prototype = $extend(haxe_ui_components_Scroll.prototype,{
+	registerBehaviours: function() {
+		haxe_ui_components_Scroll.prototype.registerBehaviours.call(this);
+		this.behaviours.register("posFromCoord",haxe_ui_components__$HorizontalScroll_PosFromCoord);
+		this.behaviours.register("applyPageFromCoord",haxe_ui_components__$HorizontalScroll_ApplyPageFromCoord);
+	}
+	,createChildren: function() {
+		haxe_ui_components_Scroll.prototype.createChildren.call(this);
+		if(this.get_componentWidth() <= 0) {
+			this.set_componentWidth(150);
+		}
+	}
+	,createDefaults: function() {
+		haxe_ui_components_Scroll.prototype.createDefaults.call(this);
+		this._defaultLayoutClass = haxe_ui_components__$HorizontalScroll_HorizontalScrollLayout;
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_components_Scroll.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_components_HorizontalScroll();
+	}
+	,__class__: haxe_ui_components_HorizontalScroll
+});
+var haxe_ui_components__$HorizontalScroll_PosFromCoord = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._HorizontalScroll.PosFromCoord"] = haxe_ui_components__$HorizontalScroll_PosFromCoord;
+haxe_ui_components__$HorizontalScroll_PosFromCoord.__name__ = "haxe.ui.components._HorizontalScroll.PosFromCoord";
+haxe_ui_components__$HorizontalScroll_PosFromCoord.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_components__$HorizontalScroll_PosFromCoord.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	call: function(pos) {
+		var p = js_Boot.__cast(pos , haxe_ui_geom_Point);
+		var scroll = js_Boot.__cast(this._component , haxe_ui_components_Scroll);
+		var deinc = this._component.findComponent("scroll-deinc-button");
+		var thumb = this._component.findComponent("scroll-thumb-button");
+		var xpos = p.x;
+		var minX = 0;
+		if(deinc != null && deinc.get_hidden() == false) {
+			minX = deinc.get_width() + scroll.get_layout().get_horizontalSpacing();
+		}
+		var maxX = scroll.get_layout().get_usableWidth() - thumb.get_width();
+		if(deinc != null && deinc.get_hidden() == false) {
+			maxX += deinc.get_width() + scroll.get_layout().get_horizontalSpacing();
+		}
+		if(xpos < minX) {
+			xpos = minX;
+		} else if(xpos > maxX) {
+			xpos = maxX;
+		}
+		var ucx = scroll.get_layout().get_usableWidth();
+		ucx -= thumb.get_width();
+		var m = scroll.get_max() - scroll.get_min() | 0;
+		var v = xpos - minX;
+		var value = scroll.get_min() + v / ucx * m;
+		return haxe_ui_util_Variant.fromFloat(value);
+	}
+	,__class__: haxe_ui_components__$HorizontalScroll_PosFromCoord
+});
+var haxe_ui_components__$HorizontalScroll_ApplyPageFromCoord = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._HorizontalScroll.ApplyPageFromCoord"] = haxe_ui_components__$HorizontalScroll_ApplyPageFromCoord;
+haxe_ui_components__$HorizontalScroll_ApplyPageFromCoord.__name__ = "haxe.ui.components._HorizontalScroll.ApplyPageFromCoord";
+haxe_ui_components__$HorizontalScroll_ApplyPageFromCoord.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_components__$HorizontalScroll_ApplyPageFromCoord.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	call: function(pos) {
+		var p = js_Boot.__cast(pos , haxe_ui_geom_Point);
+		var scroll = js_Boot.__cast(this._component , haxe_ui_components_Scroll);
+		var thumb = this._component.findComponent("scroll-thumb-button");
+		if(p.x < thumb.get_screenLeft()) {
+			scroll.set_pos(scroll.get_pos() - scroll.get_pageSize());
+		} else if(p.x > thumb.get_screenLeft() + thumb.get_width()) {
+			scroll.set_pos(scroll.get_pos() + scroll.get_pageSize());
+		}
+		return null;
+	}
+	,__class__: haxe_ui_components__$HorizontalScroll_ApplyPageFromCoord
+});
+var haxe_ui_components__$HorizontalScroll_HorizontalScrollLayout = function() {
+	haxe_ui_layouts_DefaultLayout.call(this);
+};
+$hxClasses["haxe.ui.components._HorizontalScroll.HorizontalScrollLayout"] = haxe_ui_components__$HorizontalScroll_HorizontalScrollLayout;
+haxe_ui_components__$HorizontalScroll_HorizontalScrollLayout.__name__ = "haxe.ui.components._HorizontalScroll.HorizontalScrollLayout";
+haxe_ui_components__$HorizontalScroll_HorizontalScrollLayout.__super__ = haxe_ui_layouts_DefaultLayout;
+haxe_ui_components__$HorizontalScroll_HorizontalScrollLayout.prototype = $extend(haxe_ui_layouts_DefaultLayout.prototype,{
+	resizeChildren: function() {
+		haxe_ui_layouts_DefaultLayout.prototype.resizeChildren.call(this);
+		var scroll = js_Boot.__cast(this.get_component() , haxe_ui_components_Scroll);
+		var thumb = this.get_component().findComponent("scroll-thumb-button");
+		if(thumb != null) {
+			var m = scroll.get_max() - scroll.get_min();
+			var ucx = this.get_usableWidth();
+			var thumbWidth = scroll.get_pageSize() / m * ucx;
+			if(thumbWidth < this.get_innerHeight()) {
+				thumbWidth = this.get_innerHeight();
+			} else if(thumbWidth > ucx) {
+				thumbWidth = ucx;
+			}
+			if(thumbWidth > 0 && isNaN(thumbWidth) == false) {
+				thumb.set_width(thumbWidth);
+			}
+		}
+	}
+	,repositionChildren: function() {
+		haxe_ui_layouts_DefaultLayout.prototype.repositionChildren.call(this);
+		var deinc = this.get_component().findComponent("scroll-deinc-button");
+		var inc = this.get_component().findComponent("scroll-inc-button");
+		if(inc != null && this.hidden(inc) == false) {
+			inc.set_left(this.get_component().get_width() - inc.get_width() - this.get_paddingRight());
+		}
+		var scroll = js_Boot.__cast(this.get_component() , haxe_ui_components_Scroll);
+		var thumb = this.get_component().findComponent("scroll-thumb-button");
+		if(thumb != null) {
+			var m = scroll.get_max() - scroll.get_min();
+			var u = this.get_usableWidth();
+			u -= thumb.get_componentWidth();
+			var x = (scroll.get_pos() - scroll.get_min()) / m * u;
+			x += this.get_paddingLeft();
+			if(deinc != null && this.hidden(deinc) == false) {
+				x += deinc.get_width() + this.get_horizontalSpacing();
+			}
+			thumb.set_left(x);
+			thumb.set_top(Math.round(thumb.get_top()));
+		}
+	}
+	,get_usableWidth: function() {
+		var ucx = this.get_innerWidth();
+		var deinc = this.get_component().findComponent("scroll-deinc-button");
+		var inc = this.get_component().findComponent("scroll-inc-button");
+		if(deinc != null && this.hidden(deinc) == false) {
+			ucx -= deinc.get_width() + this.get_horizontalSpacing();
+		}
+		if(inc != null && this.hidden(inc) == false) {
+			ucx -= inc.get_width() + this.get_horizontalSpacing();
+		}
+		return ucx;
+	}
+	,__class__: haxe_ui_components__$HorizontalScroll_HorizontalScrollLayout
+});
 var haxe_ui_components_Image = function() {
 	haxe_ui_core_Component.call(this);
 };
@@ -10489,6 +13769,1750 @@ haxe_ui_components__$Label_Builder.prototype = $extend(haxe_ui_core_CompositeBui
 	}
 	,__class__: haxe_ui_components__$Label_Builder
 });
+var haxe_ui_components__$Scroll_Events = function(scroll) {
+	haxe_ui_events_Events.call(this,scroll);
+	this._scroll = scroll;
+	this._deincButton = this._scroll.findComponent("scroll-deinc-button");
+	this._incButton = this._scroll.findComponent("scroll-inc-button");
+	this._thumb = this._scroll.findComponent("scroll-thumb-button");
+};
+$hxClasses["haxe.ui.components._Scroll.Events"] = haxe_ui_components__$Scroll_Events;
+haxe_ui_components__$Scroll_Events.__name__ = "haxe.ui.components._Scroll.Events";
+haxe_ui_components__$Scroll_Events.__super__ = haxe_ui_events_Events;
+haxe_ui_components__$Scroll_Events.prototype = $extend(haxe_ui_events_Events.prototype,{
+	_scroll: null
+	,_deincButton: null
+	,_incButton: null
+	,_thumb: null
+	,register: function() {
+		if(this.hasEvent("mousedown",$bind(this,this.onMouseDown)) == false) {
+			this.registerEvent("mousedown",$bind(this,this.onMouseDown));
+		}
+		if(this._deincButton != null && this._deincButton.hasEvent("click",$bind(this,this.onDeinc)) == false) {
+			this._deincButton.registerEvent("click",$bind(this,this.onDeinc));
+		}
+		if(this._incButton != null && this._incButton.hasEvent("click",$bind(this,this.onInc)) == false) {
+			this._incButton.registerEvent("click",$bind(this,this.onInc));
+		}
+		if(this._thumb != null && this._thumb.hasEvent("mousedown",$bind(this,this.onThumbMouseDown)) == false) {
+			this._thumb.registerEvent("mousedown",$bind(this,this.onThumbMouseDown));
+		}
+	}
+	,unregister: function() {
+		this.unregisterEvent("mousedown",$bind(this,this.onMouseDown));
+		if(this._deincButton != null) {
+			this._deincButton.unregisterEvent("click",$bind(this,this.onDeinc));
+		}
+		if(this._incButton != null) {
+			this._incButton.unregisterEvent("click",$bind(this,this.onInc));
+		}
+		if(this._thumb != null) {
+			this._thumb.unregisterEvent("mousedown",$bind(this,this.onThumbMouseDown));
+		}
+	}
+	,onMouseDown: function(event) {
+		var componentOffset = this._scroll.getComponentOffset();
+		if(this._deincButton.hitTest(event.screenX - componentOffset.x,event.screenY - componentOffset.y) == false && this._incButton.hitTest(event.screenX - componentOffset.x,event.screenY - componentOffset.y) == false) {
+			this._scroll.applyPageFromCoord(new haxe_ui_geom_Point(event.screenX - componentOffset.x,event.screenY - componentOffset.y));
+		}
+	}
+	,onDeinc: function(event) {
+		var fh = this._scroll;
+		fh.set_pos(fh.get_pos() - this._scroll.get_increment());
+	}
+	,onInc: function(event) {
+		var fh = this._scroll;
+		fh.set_pos(fh.get_pos() + this._scroll.get_increment());
+	}
+	,_mouseDownOffset: null
+	,onThumbMouseDown: function(event) {
+		this._mouseDownOffset = new haxe_ui_geom_Point();
+		var tmp = event.screenX - this._thumb.get_left();
+		var tmp1 = this._scroll.get_layout().get_paddingLeft();
+		this._mouseDownOffset.x = tmp + tmp1;
+		var tmp = event.screenY - this._thumb.get_top();
+		var tmp1 = this._scroll.get_layout().get_paddingTop();
+		this._mouseDownOffset.y = tmp + tmp1;
+		this._scroll.get_screen().registerEvent("mouseup",$bind(this,this.onScreenMouseUp));
+		this._scroll.get_screen().registerEvent("mousemove",$bind(this,this.onScreenMouseMove));
+	}
+	,onScreenMouseUp: function(event) {
+		this._mouseDownOffset = null;
+		this._scroll.get_screen().unregisterEvent("mouseup",$bind(this,this.onScreenMouseUp));
+		this._scroll.get_screen().unregisterEvent("mousemove",$bind(this,this.onScreenMouseMove));
+	}
+	,onScreenMouseMove: function(event) {
+		if(this._mouseDownOffset == null) {
+			return;
+		}
+		var coord = new haxe_ui_geom_Point(event.screenX - this._mouseDownOffset.x,event.screenY - this._mouseDownOffset.y);
+		this._scroll.set_pos(this._scroll.posFromCoord(coord));
+	}
+	,__class__: haxe_ui_components__$Scroll_Events
+});
+var haxe_ui_components__$Scroll_ScrollValueBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._Scroll.ScrollValueBehaviour"] = haxe_ui_components__$Scroll_ScrollValueBehaviour;
+haxe_ui_components__$Scroll_ScrollValueBehaviour.__name__ = "haxe.ui.components._Scroll.ScrollValueBehaviour";
+haxe_ui_components__$Scroll_ScrollValueBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_components__$Scroll_ScrollValueBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	set: function(value) {
+		if(haxe_ui_util_Variant.eq(value,this.get())) {
+			return;
+		}
+		haxe_ui_behaviours_DataBehaviour.prototype.set.call(this,value);
+		var _this = this._component;
+		if(!(_this._layout == null || _this._layoutLocked == true)) {
+			_this.invalidateComponent("layout",false);
+		}
+	}
+	,validateData: function() {
+		var scroll = js_Boot.__cast(this._component , haxe_ui_components_Scroll);
+		var pos = scroll.get_pos();
+		var min = scroll.get_min();
+		var max = scroll.get_max();
+		if(pos < min) {
+			scroll.set_pos(min);
+		} else if(pos > max) {
+			scroll.set_pos(max);
+		}
+		var changeEvent = new haxe_ui_events_UIEvent("change");
+		scroll.dispatch(changeEvent);
+	}
+	,__class__: haxe_ui_components__$Scroll_ScrollValueBehaviour
+});
+var haxe_ui_components_Stepper = function() {
+	haxe_ui_containers_VBox.call(this);
+};
+$hxClasses["haxe.ui.components.Stepper"] = haxe_ui_components_Stepper;
+haxe_ui_components_Stepper.__name__ = "haxe.ui.components.Stepper";
+haxe_ui_components_Stepper.__super__ = haxe_ui_containers_VBox;
+haxe_ui_components_Stepper.prototype = $extend(haxe_ui_containers_VBox.prototype,{
+	increment: function() {
+		return this.behaviours.call("increment",null);
+	}
+	,deincrement: function() {
+		return this.behaviours.call("deincrement",null);
+	}
+	,registerComposite: function() {
+		haxe_ui_containers_VBox.prototype.registerComposite.call(this);
+		this._internalEventsClass = haxe_ui_components__$Stepper_Events;
+		this._compositeBuilderClass = haxe_ui_components__$Stepper_Builder;
+	}
+	,registerBehaviours: function() {
+		haxe_ui_containers_VBox.prototype.registerBehaviours.call(this);
+		this.behaviours.register("pos",haxe_ui_components__$Stepper_PosBehaviour);
+		this.behaviours.register("step",haxe_ui_behaviours_DefaultBehaviour,haxe_ui_util_Variant.fromInt(1));
+		this.behaviours.register("min",haxe_ui_behaviours_DefaultBehaviour,null);
+		this.behaviours.register("max",haxe_ui_behaviours_DefaultBehaviour,null);
+		this.behaviours.register("precision",haxe_ui_behaviours_DefaultBehaviour,null);
+		this.behaviours.register("repeater",haxe_ui_behaviours_DefaultBehaviour,haxe_ui_util_Variant.fromBool(true));
+		this.behaviours.register("repeatInterval",haxe_ui_behaviours_DefaultBehaviour,haxe_ui_util_Variant.fromInt(100));
+		this.behaviours.register("increment",haxe_ui_components__$Stepper_IncBehaviour);
+		this.behaviours.register("deincrement",haxe_ui_components__$Stepper_DeincBehaviour);
+	}
+	,get_pos: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("pos"));
+	}
+	,set_pos: function(value) {
+		this.behaviours.set("pos",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"pos"));
+		return value;
+	}
+	,get_step: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("step"));
+	}
+	,set_step: function(value) {
+		this.behaviours.set("step",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"step"));
+		return value;
+	}
+	,get_min: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("min"));
+	}
+	,set_min: function(value) {
+		this.behaviours.set("min",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"min"));
+		return value;
+	}
+	,get_max: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("max"));
+	}
+	,set_max: function(value) {
+		this.behaviours.set("max",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"max"));
+		return value;
+	}
+	,get_precision: function() {
+		return haxe_ui_util_Variant.toInt(this.behaviours.get("precision"));
+	}
+	,set_precision: function(value) {
+		this.behaviours.set("precision",haxe_ui_util_Variant.fromInt(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"precision"));
+		return value;
+	}
+	,get_repeater: function() {
+		return haxe_ui_util_Variant.toBool(this.behaviours.get("repeater"));
+	}
+	,set_repeater: function(value) {
+		this.behaviours.set("repeater",haxe_ui_util_Variant.fromBool(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"repeater"));
+		return value;
+	}
+	,get_repeatInterval: function() {
+		return haxe_ui_util_Variant.toInt(this.behaviours.get("repeatInterval"));
+	}
+	,set_repeatInterval: function(value) {
+		this.behaviours.set("repeatInterval",haxe_ui_util_Variant.fromInt(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"repeatInterval"));
+		return value;
+	}
+	,get_value: function() {
+		return this.get_pos();
+	}
+	,set_value: function(value) {
+		this.set_pos(value);
+		return value;
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_containers_VBox.prototype.cloneComponent.call(this);
+		c.set_pos(this.get_pos());
+		c.set_step(this.get_step());
+		if(this.get_min() != null) {
+			c.set_min(this.get_min());
+		}
+		if(this.get_max() != null) {
+			c.set_max(this.get_max());
+		}
+		if(this.get_precision() != null) {
+			c.set_precision(this.get_precision());
+		}
+		c.set_repeater(this.get_repeater());
+		c.set_repeatInterval(this.get_repeatInterval());
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_components_Stepper();
+	}
+	,__class__: haxe_ui_components_Stepper
+	,__properties__: $extend(haxe_ui_containers_VBox.prototype.__properties__,{set_repeatInterval:"set_repeatInterval",get_repeatInterval:"get_repeatInterval",set_repeater:"set_repeater",get_repeater:"get_repeater",set_precision:"set_precision",get_precision:"get_precision",set_max:"set_max",get_max:"get_max",set_min:"set_min",get_min:"get_min",set_step:"set_step",get_step:"get_step",set_pos:"set_pos",get_pos:"get_pos"})
+});
+var haxe_ui_components__$Stepper_PosBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._Stepper.PosBehaviour"] = haxe_ui_components__$Stepper_PosBehaviour;
+haxe_ui_components__$Stepper_PosBehaviour.__name__ = "haxe.ui.components._Stepper.PosBehaviour";
+haxe_ui_components__$Stepper_PosBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_components__$Stepper_PosBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		var stepper = js_Boot.__cast(this._component , haxe_ui_components_Stepper);
+		var v = haxe_ui_util_Variant.toFloat(this._value);
+		var min = stepper.get_min();
+		var max = stepper.get_max();
+		var v1;
+		if(v == null || isNaN(v)) {
+			v1 = min;
+		} else {
+			if(min != null && v < min) {
+				v = min;
+			} else if(max != null && v > max) {
+				v = max;
+			}
+			v1 = v;
+		}
+		stepper.set_pos(v1);
+		this._value = haxe_ui_util_Variant.fromFloat(v1);
+		var event = new haxe_ui_events_UIEvent("change");
+		this._component.dispatch(event);
+	}
+	,__class__: haxe_ui_components__$Stepper_PosBehaviour
+});
+var haxe_ui_components__$Stepper_IncBehaviour = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._Stepper.IncBehaviour"] = haxe_ui_components__$Stepper_IncBehaviour;
+haxe_ui_components__$Stepper_IncBehaviour.__name__ = "haxe.ui.components._Stepper.IncBehaviour";
+haxe_ui_components__$Stepper_IncBehaviour.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_components__$Stepper_IncBehaviour.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	call: function(param) {
+		var stepper = js_Boot.__cast(this._component , haxe_ui_components_Stepper);
+		var newPos = stepper.get_pos();
+		newPos += stepper.get_step();
+		if(stepper.get_max() != null && newPos > stepper.get_max()) {
+			newPos = stepper.get_max();
+		}
+		if(stepper.get_precision() != null) {
+			var precision = stepper.get_precision();
+			if(precision == null) {
+				precision = 0;
+			}
+			newPos = Math.round(newPos * Math.pow(10,precision)) / Math.pow(10,precision);
+		}
+		stepper.set_pos(newPos);
+		return null;
+	}
+	,__class__: haxe_ui_components__$Stepper_IncBehaviour
+});
+var haxe_ui_components__$Stepper_DeincBehaviour = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._Stepper.DeincBehaviour"] = haxe_ui_components__$Stepper_DeincBehaviour;
+haxe_ui_components__$Stepper_DeincBehaviour.__name__ = "haxe.ui.components._Stepper.DeincBehaviour";
+haxe_ui_components__$Stepper_DeincBehaviour.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_components__$Stepper_DeincBehaviour.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	call: function(param) {
+		var stepper = js_Boot.__cast(this._component , haxe_ui_components_Stepper);
+		var newPos = stepper.get_pos();
+		newPos -= stepper.get_step();
+		if(stepper.get_min() != null && newPos < stepper.get_min()) {
+			newPos = stepper.get_min();
+		}
+		if(stepper.get_precision() != null) {
+			var precision = stepper.get_precision();
+			if(precision == null) {
+				precision = 0;
+			}
+			newPos = Math.round(newPos * Math.pow(10,precision)) / Math.pow(10,precision);
+		}
+		stepper.set_pos(newPos);
+		return null;
+	}
+	,__class__: haxe_ui_components__$Stepper_DeincBehaviour
+});
+var haxe_ui_components__$Stepper_Builder = function(stepper) {
+	haxe_ui_core_CompositeBuilder.call(this,stepper);
+	this._stepper = stepper;
+};
+$hxClasses["haxe.ui.components._Stepper.Builder"] = haxe_ui_components__$Stepper_Builder;
+haxe_ui_components__$Stepper_Builder.__name__ = "haxe.ui.components._Stepper.Builder";
+haxe_ui_components__$Stepper_Builder.__super__ = haxe_ui_core_CompositeBuilder;
+haxe_ui_components__$Stepper_Builder.prototype = $extend(haxe_ui_core_CompositeBuilder.prototype,{
+	_stepper: null
+	,create: function() {
+		var button = new haxe_ui_components_Button();
+		button.set_styleNames("stepper-button stepper-inc");
+		button.set_id("stepper-inc");
+		button.set_repeater(this._stepper.get_repeater());
+		button.set_easeInRepeater(true);
+		button.set_allowFocus(false);
+		button.set_repeatInterval(this._stepper.get_repeatInterval());
+		this._stepper.addComponent(button);
+		var button = new haxe_ui_components_Button();
+		button.set_styleNames("stepper-button stepper-deinc");
+		button.set_id("stepper-deinc");
+		button.set_repeater(this._stepper.get_repeater());
+		button.set_easeInRepeater(true);
+		button.set_allowFocus(false);
+		button.set_repeatInterval(this._stepper.get_repeatInterval());
+		this._stepper.addComponent(button);
+	}
+	,__class__: haxe_ui_components__$Stepper_Builder
+});
+var haxe_ui_components__$Stepper_Events = function(stepper) {
+	haxe_ui_events_Events.call(this,stepper);
+	this._stepper = stepper;
+};
+$hxClasses["haxe.ui.components._Stepper.Events"] = haxe_ui_components__$Stepper_Events;
+haxe_ui_components__$Stepper_Events.__name__ = "haxe.ui.components._Stepper.Events";
+haxe_ui_components__$Stepper_Events.__super__ = haxe_ui_events_Events;
+haxe_ui_components__$Stepper_Events.prototype = $extend(haxe_ui_events_Events.prototype,{
+	_stepper: null
+	,register: function() {
+		var button = this._stepper.findComponent("stepper-inc",haxe_ui_components_Button);
+		if(!button.hasEvent("click",$bind(this,this.onInc))) {
+			button.registerEvent("click",$bind(this,this.onInc));
+		}
+		var button = this._stepper.findComponent("stepper-deinc",haxe_ui_components_Button);
+		if(!button.hasEvent("click",$bind(this,this.onDeinc))) {
+			button.registerEvent("click",$bind(this,this.onDeinc));
+		}
+	}
+	,unregister: function() {
+		var button = this._stepper.findComponent("stepper-inc",haxe_ui_components_Button);
+		button.unregisterEvent("click",$bind(this,this.onInc));
+		var button = this._stepper.findComponent("stepper-deinc",haxe_ui_components_Button);
+		button.unregisterEvent("click",$bind(this,this.onDeinc));
+	}
+	,onInc: function(event) {
+		this._stepper.increment();
+	}
+	,onDeinc: function(event) {
+		this._stepper.deincrement();
+	}
+	,__class__: haxe_ui_components__$Stepper_Events
+});
+var haxe_ui_components_TabBar = function() {
+	haxe_ui_core_Component.call(this);
+};
+$hxClasses["haxe.ui.components.TabBar"] = haxe_ui_components_TabBar;
+haxe_ui_components_TabBar.__name__ = "haxe.ui.components.TabBar";
+haxe_ui_components_TabBar.__super__ = haxe_ui_core_Component;
+haxe_ui_components_TabBar.prototype = $extend(haxe_ui_core_Component.prototype,{
+	removeTab: function(index) {
+		return this.behaviours.call("removeTab",index);
+	}
+	,getTab: function(index) {
+		return haxe_ui_util_Variant.toComponent(this.behaviours.call("getTab",index));
+	}
+	,registerComposite: function() {
+		haxe_ui_core_Component.prototype.registerComposite.call(this);
+		this._compositeBuilderClass = haxe_ui_components__$TabBar_Builder;
+		this._internalEventsClass = haxe_ui_components__$TabBar_Events;
+		this._defaultLayoutClass = haxe_ui_components_TabBarLayout;
+	}
+	,registerBehaviours: function() {
+		haxe_ui_core_Component.prototype.registerBehaviours.call(this);
+		this.behaviours.register("selectedIndex",haxe_ui_components__$TabBar_SelectedIndex,haxe_ui_util_Variant.fromInt(-1));
+		this.behaviours.register("selectedTab",haxe_ui_components__$TabBar_SelectedTab);
+		this.behaviours.register("tabPosition",haxe_ui_components__$TabBar_TabPosition,haxe_ui_util_Variant.fromString("top"));
+		this.behaviours.register("tabCount",haxe_ui_components__$TabBar_TabCount);
+		this.behaviours.register("closable",haxe_ui_components__$TabBar_Closable,haxe_ui_util_Variant.fromBool(false));
+		this.behaviours.register("removeTab",haxe_ui_components__$TabBar_RemoveTab);
+		this.behaviours.register("getTab",haxe_ui_components__$TabBar_GetTab);
+	}
+	,get_selectedIndex: function() {
+		return haxe_ui_util_Variant.toInt(this.behaviours.get("selectedIndex"));
+	}
+	,set_selectedIndex: function(value) {
+		this.behaviours.set("selectedIndex",haxe_ui_util_Variant.fromInt(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"selectedIndex"));
+		return value;
+	}
+	,get_selectedTab: function() {
+		return haxe_ui_util_Variant.toComponent(this.behaviours.get("selectedTab"));
+	}
+	,set_selectedTab: function(value) {
+		this.behaviours.set("selectedTab",haxe_ui_util_Variant.fromComponent(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"selectedTab"));
+		return value;
+	}
+	,get_tabPosition: function() {
+		return haxe_ui_util_Variant.toString(this.behaviours.get("tabPosition"));
+	}
+	,set_tabPosition: function(value) {
+		var _g = Type.typeof(value);
+		if(_g._hx_index == 6) {
+			if(_g.c == String) {
+				if(value != null && value.indexOf("{{") != -1 && value.indexOf("}}") != -1) {
+					haxe_ui_locale_LocaleManager.get_instance().registerComponent(this,"tabPosition",null,value);
+					return value;
+				}
+			}
+		}
+		this.behaviours.set("tabPosition",haxe_ui_util_Variant.fromString(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"tabPosition"));
+		return value;
+	}
+	,get_tabCount: function() {
+		return haxe_ui_util_Variant.toInt(this.behaviours.get("tabCount"));
+	}
+	,set_tabCount: function(value) {
+		this.behaviours.set("tabCount",haxe_ui_util_Variant.fromInt(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"tabCount"));
+		return value;
+	}
+	,get_closable: function() {
+		return haxe_ui_util_Variant.toBool(this.behaviours.get("closable"));
+	}
+	,set_closable: function(value) {
+		this.behaviours.set("closable",haxe_ui_util_Variant.fromBool(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"closable"));
+		return value;
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_core_Component.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_components_TabBar();
+	}
+	,__class__: haxe_ui_components_TabBar
+	,__properties__: $extend(haxe_ui_core_Component.prototype.__properties__,{set_closable:"set_closable",get_closable:"get_closable",set_tabCount:"set_tabCount",get_tabCount:"get_tabCount",set_tabPosition:"set_tabPosition",get_tabPosition:"get_tabPosition",set_selectedTab:"set_selectedTab",get_selectedTab:"get_selectedTab",set_selectedIndex:"set_selectedIndex",get_selectedIndex:"get_selectedIndex"})
+});
+var haxe_ui_components_TabBarLayout = function() {
+	haxe_ui_layouts_DefaultLayout.call(this);
+};
+$hxClasses["haxe.ui.components.TabBarLayout"] = haxe_ui_components_TabBarLayout;
+haxe_ui_components_TabBarLayout.__name__ = "haxe.ui.components.TabBarLayout";
+haxe_ui_components_TabBarLayout.__super__ = haxe_ui_layouts_DefaultLayout;
+haxe_ui_components_TabBarLayout.prototype = $extend(haxe_ui_layouts_DefaultLayout.prototype,{
+	repositionChildren: function() {
+		haxe_ui_layouts_DefaultLayout.prototype.repositionChildren.call(this);
+		var filler = this._component.findComponent("tabbar-filler",null,false);
+		if(filler != null) {
+			var container = this._component.findComponent("tabbar-contents",null,false);
+			filler.set_width(this._component.get_width() - container.get_width());
+			filler.set_height(this._component.get_height());
+			filler.set_left(container.get_width());
+		}
+		var left = this._component.findComponent("tabbar-scroll-left",null,false);
+		var right = this._component.findComponent("tabbar-scroll-right",null,false);
+		if(left != null && this.hidden(left) == false) {
+			var x = this._component.get_width() - left.get_width();
+			if(right != null) {
+				x -= right.get_width();
+			}
+			left.set_left(x + 1);
+			left.set_top(this._component.get_height() / 2 - left.get_height() / 2);
+		}
+		if(right != null && this.hidden(right) == false) {
+			right.set_left(this._component.get_width() - right.get_width());
+			right.set_top(this._component.get_height() / 2 - right.get_height() / 2);
+		}
+	}
+	,__class__: haxe_ui_components_TabBarLayout
+});
+var haxe_ui_components__$TabBar_Closable = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._TabBar.Closable"] = haxe_ui_components__$TabBar_Closable;
+haxe_ui_components__$TabBar_Closable.__name__ = "haxe.ui.components._TabBar.Closable";
+haxe_ui_components__$TabBar_Closable.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_components__$TabBar_Closable.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		var builder = js_Boot.__cast(this._component._compositeBuilder , haxe_ui_components__$TabBar_Builder);
+		if(builder._container == null) {
+			return;
+		}
+		var buttons = builder._container.findComponents(null,haxe_ui_components__$TabBar_TabBarButton,1);
+		var _g = 0;
+		while(_g < buttons.length) {
+			var b = buttons[_g];
+			++_g;
+			b.set_closable(haxe_ui_util_Variant.toBool(this._value));
+		}
+	}
+	,__class__: haxe_ui_components__$TabBar_Closable
+});
+var haxe_ui_components__$TabBar_SelectedIndex = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._TabBar.SelectedIndex"] = haxe_ui_components__$TabBar_SelectedIndex;
+haxe_ui_components__$TabBar_SelectedIndex.__name__ = "haxe.ui.components._TabBar.SelectedIndex";
+haxe_ui_components__$TabBar_SelectedIndex.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_components__$TabBar_SelectedIndex.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		var builder = js_Boot.__cast(this._component._compositeBuilder , haxe_ui_components__$TabBar_Builder);
+		if(builder._container == null) {
+			return;
+		}
+		if(haxe_ui_util_Variant.lt(this._value,haxe_ui_util_Variant.fromInt(0))) {
+			return;
+		}
+		var _this = builder._container;
+		if(haxe_ui_util_Variant.gt(this._value,haxe_ui_util_Variant.fromInt((_this._children == null ? [] : _this._children).length - 1))) {
+			var _this = builder._container;
+			this._value = haxe_ui_util_Variant.fromInt((_this._children == null ? [] : _this._children).length - 1);
+			return;
+		}
+		var tab = js_Boot.__cast(builder._container.getComponentAt(haxe_ui_util_Variant.toInt(this._value)) , haxe_ui_components_Button);
+		if(tab != null) {
+			var selectedTab = (js_Boot.__cast(this._component , haxe_ui_components_TabBar)).get_selectedTab();
+			if(selectedTab != null) {
+				selectedTab.removeClass("tabbar-button-selected");
+				var label = selectedTab.findComponent(null,haxe_ui_components_Label);
+				if(label != null) {
+					label.invalidateComponent();
+				}
+				var icon = selectedTab.findComponent(null,haxe_ui_components_Image);
+				if(icon != null) {
+					icon.invalidateComponent();
+				}
+			}
+			tab.addClass("tabbar-button-selected");
+			var label = tab.findComponent(null,haxe_ui_components_Label);
+			if(label != null) {
+				label.invalidateComponent();
+			}
+			var icon = tab.findComponent(null,haxe_ui_components_Image);
+			if(icon != null) {
+				icon.invalidateComponent();
+			}
+			var rangeMin = Math.abs(builder._container.get_left());
+			var rangeMax = rangeMin + this._component.get_width();
+			var left = this._component.findComponent("tabbar-scroll-left",haxe_ui_components_Button);
+			var right = this._component.findComponent("tabbar-scroll-right",haxe_ui_components_Button);
+			if(left != null && left.get_hidden() == false) {
+				rangeMax -= left.get_width();
+				rangeMax -= this._component.get_layout().get_horizontalSpacing();
+			}
+			if(right != null && right.get_hidden() == false) {
+				rangeMax -= right.get_width();
+			}
+			if(tab.get_left() < rangeMin || tab.get_left() + tab.get_width() > rangeMax) {
+				var max = -(builder._container.get_width() - this._component.get_width());
+				var x = -tab.get_left() + this._component.get_layout().get_paddingLeft();
+				if(left != null && left.get_hidden() == false) {
+					max -= left.get_width();
+					max -= this._component.get_layout().get_horizontalSpacing();
+				}
+				if(right != null && right.get_hidden() == false) {
+					max -= right.get_width();
+				}
+				if(x < max) {
+					x = max;
+				}
+				builder._containerPosition = x;
+				builder._container.set_left(x);
+			}
+			var _this = this._component;
+			if(!(_this._layout == null || _this._layoutLocked == true)) {
+				_this.invalidateComponent("layout",false);
+			}
+			this._component.dispatch(new haxe_ui_events_UIEvent("change"));
+		}
+	}
+	,__class__: haxe_ui_components__$TabBar_SelectedIndex
+});
+var haxe_ui_components__$TabBar_SelectedTab = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._TabBar.SelectedTab"] = haxe_ui_components__$TabBar_SelectedTab;
+haxe_ui_components__$TabBar_SelectedTab.__name__ = "haxe.ui.components._TabBar.SelectedTab";
+haxe_ui_components__$TabBar_SelectedTab.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_components__$TabBar_SelectedTab.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	get: function() {
+		var builder = js_Boot.__cast(this._component._compositeBuilder , haxe_ui_components__$TabBar_Builder);
+		return haxe_ui_util_Variant.fromComponent(builder._container.findComponent("tabbar-button-selected",null,false,"css"));
+	}
+	,__class__: haxe_ui_components__$TabBar_SelectedTab
+});
+var haxe_ui_components__$TabBar_TabPosition = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._TabBar.TabPosition"] = haxe_ui_components__$TabBar_TabPosition;
+haxe_ui_components__$TabBar_TabPosition.__name__ = "haxe.ui.components._TabBar.TabPosition";
+haxe_ui_components__$TabBar_TabPosition.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_components__$TabBar_TabPosition.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		var builder = js_Boot.__cast(this._component._compositeBuilder , haxe_ui_components__$TabBar_Builder);
+		if(haxe_ui_util_Variant.eq(this._value,haxe_ui_util_Variant.fromString("bottom"))) {
+			this._component.addClass(":bottom");
+			var _g = 0;
+			var _this = builder._container;
+			var _g1 = _this._children == null ? [] : _this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				child.addClass(":bottom");
+			}
+		} else {
+			this._component.removeClass(":bottom");
+			var _g = 0;
+			var _this = builder._container;
+			var _g1 = _this._children == null ? [] : _this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				child.removeClass(":bottom");
+			}
+		}
+	}
+	,__class__: haxe_ui_components__$TabBar_TabPosition
+});
+var haxe_ui_components__$TabBar_TabCount = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._TabBar.TabCount"] = haxe_ui_components__$TabBar_TabCount;
+haxe_ui_components__$TabBar_TabCount.__name__ = "haxe.ui.components._TabBar.TabCount";
+haxe_ui_components__$TabBar_TabCount.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_components__$TabBar_TabCount.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	get: function() {
+		var builder = js_Boot.__cast(this._component._compositeBuilder , haxe_ui_components__$TabBar_Builder);
+		var _this = builder._container;
+		return haxe_ui_util_Variant.fromInt((_this._children == null ? [] : _this._children).length);
+	}
+	,__class__: haxe_ui_components__$TabBar_TabCount
+});
+var haxe_ui_components__$TabBar_RemoveTab = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._TabBar.RemoveTab"] = haxe_ui_components__$TabBar_RemoveTab;
+haxe_ui_components__$TabBar_RemoveTab.__name__ = "haxe.ui.components._TabBar.RemoveTab";
+haxe_ui_components__$TabBar_RemoveTab.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_components__$TabBar_RemoveTab.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	call: function(param) {
+		var builder = js_Boot.__cast(this._component._compositeBuilder , haxe_ui_components__$TabBar_Builder);
+		var index = param;
+		var _this = builder._container;
+		if(index < (_this._children == null ? [] : _this._children).length) {
+			var selectedIndex = (js_Boot.__cast(this._component , haxe_ui_components_TabBar)).get_selectedIndex();
+			var newSelectedIndex = selectedIndex;
+			if(index < selectedIndex) {
+				--newSelectedIndex;
+			} else if(index == selectedIndex) {
+				(js_Boot.__cast(this._component , haxe_ui_components_TabBar)).set_selectedIndex(-1);
+				newSelectedIndex = selectedIndex;
+				var _this = builder._container;
+				if(newSelectedIndex > (_this._children == null ? [] : _this._children).length - 2) {
+					var _this = builder._container;
+					newSelectedIndex = (_this._children == null ? [] : _this._children).length - 2;
+				}
+			}
+			builder._container.removeComponentAt(index);
+			this._component.dispatch(new haxe_ui_events_UIEvent("close",null,index));
+			(js_Boot.__cast(this._component , haxe_ui_components_TabBar)).set_selectedIndex(newSelectedIndex);
+		}
+		return null;
+	}
+	,__class__: haxe_ui_components__$TabBar_RemoveTab
+});
+var haxe_ui_components__$TabBar_GetTab = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._TabBar.GetTab"] = haxe_ui_components__$TabBar_GetTab;
+haxe_ui_components__$TabBar_GetTab.__name__ = "haxe.ui.components._TabBar.GetTab";
+haxe_ui_components__$TabBar_GetTab.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_components__$TabBar_GetTab.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	call: function(param) {
+		var builder = js_Boot.__cast(this._component._compositeBuilder , haxe_ui_components__$TabBar_Builder);
+		var index = param;
+		var tab = null;
+		var _this = builder._container;
+		if(index < (_this._children == null ? [] : _this._children).length) {
+			var _this = builder._container;
+			tab = (_this._children == null ? [] : _this._children)[index];
+		}
+		return haxe_ui_util_Variant.fromComponent(tab);
+	}
+	,__class__: haxe_ui_components__$TabBar_GetTab
+});
+var haxe_ui_components__$TabBar_Events = function(tabbar) {
+	haxe_ui_events_Events.call(this,tabbar);
+	this._tabbar = tabbar;
+};
+$hxClasses["haxe.ui.components._TabBar.Events"] = haxe_ui_components__$TabBar_Events;
+haxe_ui_components__$TabBar_Events.__name__ = "haxe.ui.components._TabBar.Events";
+haxe_ui_components__$TabBar_Events.__super__ = haxe_ui_events_Events;
+haxe_ui_components__$TabBar_Events.prototype = $extend(haxe_ui_events_Events.prototype,{
+	_tabbar: null
+	,register: function() {
+		var builder = js_Boot.__cast(this._tabbar._compositeBuilder , haxe_ui_components__$TabBar_Builder);
+		var _g = 0;
+		var _this = builder._container;
+		var _g1 = _this._children == null ? [] : _this._children;
+		while(_g < _g1.length) {
+			var t = _g1[_g];
+			++_g;
+			if(t.hasEvent("mousedown",$bind(this,this.onTabMouseDown)) == false) {
+				t.registerEvent("mousedown",$bind(this,this.onTabMouseDown));
+			}
+		}
+		this.registerEvent("mousewheel",$bind(this,this.onMouseWheel));
+	}
+	,unregister: function() {
+		this.unregisterEvent("mousewheel",$bind(this,this.onMouseWheel));
+	}
+	,onMouseWheel: function(event) {
+		var builder = js_Boot.__cast(this._tabbar._compositeBuilder , haxe_ui_components__$TabBar_Builder);
+		if(event.delta < 0) {
+			builder.scrollLeft();
+		} else {
+			builder.scrollRight();
+		}
+	}
+	,onTabMouseDown: function(event) {
+		var builder = js_Boot.__cast(this._tabbar._compositeBuilder , haxe_ui_components__$TabBar_Builder);
+		var button = event.target;
+		var close = button.findComponent("tab-close-button",haxe_ui_components_Image,false);
+		var select = true;
+		if(close != null) {
+			select = !close.hitTest(event.screenX,event.screenY);
+		}
+		if(select == true) {
+			this._tabbar.set_selectedIndex(builder._container.getComponentIndex(button));
+		}
+	}
+	,__class__: haxe_ui_components__$TabBar_Events
+});
+var haxe_ui_components__$TabBar_Builder = function(tabbar) {
+	haxe_ui_core_CompositeBuilder.call(this,tabbar);
+	this._tabbar = tabbar;
+	this.createContainer();
+};
+$hxClasses["haxe.ui.components._TabBar.Builder"] = haxe_ui_components__$TabBar_Builder;
+haxe_ui_components__$TabBar_Builder.__name__ = "haxe.ui.components._TabBar.Builder";
+haxe_ui_components__$TabBar_Builder.__super__ = haxe_ui_core_CompositeBuilder;
+haxe_ui_components__$TabBar_Builder.prototype = $extend(haxe_ui_core_CompositeBuilder.prototype,{
+	_tabbar: null
+	,_container: null
+	,_filler: null
+	,create: function() {
+		this.createContainer();
+	}
+	,createContainer: function() {
+		if(this._filler == null) {
+			this._filler = new haxe_ui_containers_Box();
+			this._filler.set_id("tabbar-filler");
+			this._filler.addClass("tabbar-filler");
+			this._tabbar.addComponent(this._filler);
+		}
+		if(this._container == null) {
+			this._container = new haxe_ui_containers_HBox();
+			this._container.set_id("tabbar-contents");
+			this._container.addClass("tabbar-contents");
+			this._tabbar.addComponent(this._container);
+		}
+	}
+	,addTab: function(child) {
+		var button = this.createTabBarButton(child);
+		var v = this._container.addComponent(button);
+		this._tabbar.registerInternalEvents(haxe_ui_components__$TabBar_Events,true);
+		if(this._tabbar.get_selectedIndex() < 0) {
+			this._tabbar.set_selectedIndex(0);
+		}
+		return v;
+	}
+	,addTabAt: function(child,index) {
+		var button = this.createTabBarButton(child);
+		var v = this._container.addComponentAt(button,index);
+		this._tabbar.registerInternalEvents(haxe_ui_components__$TabBar_Events,true);
+		if(this._tabbar.get_selectedIndex() < 0) {
+			this._tabbar.set_selectedIndex(0);
+		} else if(index <= this._tabbar.get_selectedIndex()) {
+			var fh = this._tabbar;
+			fh.set_selectedIndex(fh.get_selectedIndex() + 1);
+		}
+		return v;
+	}
+	,createTabBarButton: function(child) {
+		var button = new haxe_ui_components__$TabBar_TabBarButton();
+		button.addClass("tabbar-button");
+		if(this._tabbar.get_tabPosition() == "bottom") {
+			button.addClass(":bottom");
+		}
+		button.set_id(child.get_id());
+		button.set_text(child.get_text());
+		button.set_tooltip(child.get_tooltip());
+		if(((child) instanceof haxe_ui_components_Button)) {
+			button.set_icon((js_Boot.__cast(child , haxe_ui_components_Button)).get_icon());
+		}
+		button.set_closable(this._tabbar.get_closable());
+		return button;
+	}
+	,get_numComponents: function() {
+		return this._container.get_numComponents();
+	}
+	,addComponent: function(child) {
+		if(child != this._container && child != this._scrollLeft && child != this._scrollRight && child != this._filler) {
+			return this.addTab(child);
+		}
+		return null;
+	}
+	,addComponentAt: function(child,index) {
+		if(child != this._container && child != this._scrollLeft && child != this._scrollRight && child != this._filler) {
+			return this.addTabAt(child,index);
+		}
+		return null;
+	}
+	,removeComponent: function(child,dispose,invalidate) {
+		if(invalidate == null) {
+			invalidate = true;
+		}
+		if(dispose == null) {
+			dispose = true;
+		}
+		if(child != this._container && child != this._scrollLeft && child != this._scrollRight && child != this._filler) {
+			var index = this._container.getComponentIndex(child);
+			if(index != -1) {
+				this._tabbar.removeTab(index);
+				return child;
+			}
+		}
+		return null;
+	}
+	,removeComponentAt: function(index,dispose,invalidate) {
+		if(invalidate == null) {
+			invalidate = true;
+		}
+		if(dispose == null) {
+			dispose = true;
+		}
+		var child = this._container.getComponentAt(index);
+		if(child != null) {
+			this._tabbar.removeTab(index);
+		}
+		return child;
+	}
+	,getComponentIndex: function(child) {
+		if(child != this._container && child != this._scrollLeft && child != this._scrollRight && child != this._filler) {
+			return this._container.getComponentIndex(child);
+		}
+		return -1;
+	}
+	,setComponentIndex: function(child,index) {
+		if(child != this._container && child != this._scrollLeft && child != this._scrollRight && child != this._filler) {
+			return this._container.setComponentIndex(child,index);
+		}
+		return null;
+	}
+	,getComponentAt: function(index) {
+		return this._container.getComponentAt(index);
+	}
+	,validateComponentLayout: function() {
+		if(this._tabbar.get_native() == true || this._container == null) {
+			return false;
+		}
+		if(this._containerPosition == null) {
+			this._containerPosition = this._tabbar.get_layout().get_paddingLeft();
+		}
+		if(this._container.get_width() > this._tabbar.get_layout().get_usableWidth() && this._tabbar.get_layout().get_usableWidth() > 0) {
+			this.showScrollButtons();
+			this._container.set_left(this._containerPosition);
+		} else {
+			this.hideScrollButtons();
+			this._containerPosition = null;
+		}
+		return true;
+	}
+	,_scrollLeft: null
+	,_scrollRight: null
+	,showScrollButtons: function() {
+		var _gthis = this;
+		if(this._scrollLeft == null) {
+			this._scrollLeft = new haxe_ui_components_Button();
+			this._scrollLeft.set_id("tabbar-scroll-left");
+			this._scrollLeft.addClass("tabbar-scroll-left");
+			this._scrollLeft.set_includeInLayout(false);
+			this._scrollLeft.set_repeater(true);
+			this._tabbar.addComponent(this._scrollLeft);
+			this._scrollLeft.set_onClick(function(e) {
+				_gthis.scrollLeft();
+			});
+		} else {
+			this._scrollLeft.show();
+		}
+		if(this._scrollRight == null) {
+			this._scrollRight = new haxe_ui_components_Button();
+			this._scrollRight.set_id("tabbar-scroll-right");
+			this._scrollRight.addClass("tabbar-scroll-right");
+			this._scrollRight.set_includeInLayout(false);
+			this._scrollRight.set_repeater(true);
+			this._tabbar.addComponent(this._scrollRight);
+			this._scrollRight.set_onClick(function(e) {
+				_gthis.scrollRight();
+			});
+		} else {
+			this._scrollRight.show();
+		}
+	}
+	,_containerPosition: null
+	,scrollLeft: function() {
+		if(this._scrollLeft == null || this._scrollLeft.get_hidden() == true) {
+			return;
+		}
+		var x = this._container.get_left() + 20;
+		if(x > this._tabbar.get_layout().get_paddingLeft()) {
+			x = this._tabbar.get_layout().get_paddingLeft();
+		}
+		this._containerPosition = x;
+		this._container.set_left(x);
+	}
+	,scrollRight: function() {
+		if(this._scrollLeft == null || this._scrollLeft.get_hidden() == true) {
+			return;
+		}
+		var x = this._container.get_left() - 20;
+		var max = -(this._container.get_width() - this._tabbar.get_width());
+		var left = this._tabbar.findComponent("tabbar-scroll-left",haxe_ui_components_Button);
+		var right = this._tabbar.findComponent("tabbar-scroll-right",haxe_ui_components_Button);
+		if(left != null && left.get_hidden() == false) {
+			max -= left.get_width();
+			max -= this._tabbar.get_layout().get_horizontalSpacing();
+		}
+		if(right != null && right.get_hidden() == false) {
+			max -= right.get_width();
+		}
+		if(x < max) {
+			x = max;
+		}
+		this._containerPosition = x;
+		this._container.set_left(x);
+	}
+	,hideScrollButtons: function() {
+		if(this._scrollLeft != null) {
+			this._scrollLeft.hide();
+		}
+		if(this._scrollRight != null) {
+			this._scrollRight.hide();
+		}
+	}
+	,__class__: haxe_ui_components__$TabBar_Builder
+});
+var haxe_ui_components__$TabBar_TabBarButton = function() {
+	this._closable = false;
+	haxe_ui_components_Button.call(this);
+};
+$hxClasses["haxe.ui.components._TabBar.TabBarButton"] = haxe_ui_components__$TabBar_TabBarButton;
+haxe_ui_components__$TabBar_TabBarButton.__name__ = "haxe.ui.components._TabBar.TabBarButton";
+haxe_ui_components__$TabBar_TabBarButton.__super__ = haxe_ui_components_Button;
+haxe_ui_components__$TabBar_TabBarButton.prototype = $extend(haxe_ui_components_Button.prototype,{
+	_closable: null
+	,get_closable: function() {
+		return this._closable;
+	}
+	,set_closable: function(value) {
+		if(this._closable == value) {
+			return value;
+		}
+		this._closable = value;
+		var existing = this.findComponent("tab-close-button",haxe_ui_components_Image,false);
+		if(this._closable == true && existing == null) {
+			this.set_iconPosition("far-left");
+			var image = new haxe_ui_components_Image();
+			image.set_id("tab-close-button");
+			image.addClass("tab-close-button");
+			image.set_includeInLayout(false);
+			image.set_scriptAccess(false);
+			image.set_onClick($bind(this,this.onCloseClicked));
+			this.addComponent(image);
+		} else if(existing != null) {
+			this.removeComponent(existing);
+		}
+		return value;
+	}
+	,onCloseClicked: function(e) {
+		var tabbar = this.findAncestor(null,haxe_ui_components_TabBar);
+		var builder = js_Boot.__cast(tabbar._compositeBuilder , haxe_ui_components__$TabBar_Builder);
+		var index = builder._container.getComponentIndex(this);
+		var event = new haxe_ui_events_UIEvent("beforeClose",null,index);
+		tabbar.dispatch(event);
+		if(event.canceled == false) {
+			if(index != -1) {
+				tabbar.removeTab(index);
+			}
+		}
+	}
+	,registerComposite: function() {
+		haxe_ui_components_Button.prototype.registerComposite.call(this);
+		this._defaultLayoutClass = haxe_ui_components__$TabBar_TabBarButtonLayout;
+	}
+	,registerBehaviours: function() {
+		haxe_ui_components_Button.prototype.registerBehaviours.call(this);
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_components_Button.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_components__$TabBar_TabBarButton();
+	}
+	,__class__: haxe_ui_components__$TabBar_TabBarButton
+	,__properties__: $extend(haxe_ui_components_Button.prototype.__properties__,{set_closable:"set_closable",get_closable:"get_closable"})
+});
+var haxe_ui_components__$TabBar_TabBarButtonLayout = function() {
+	haxe_ui_components_ButtonLayout.call(this);
+};
+$hxClasses["haxe.ui.components._TabBar.TabBarButtonLayout"] = haxe_ui_components__$TabBar_TabBarButtonLayout;
+haxe_ui_components__$TabBar_TabBarButtonLayout.__name__ = "haxe.ui.components._TabBar.TabBarButtonLayout";
+haxe_ui_components__$TabBar_TabBarButtonLayout.__super__ = haxe_ui_components_ButtonLayout;
+haxe_ui_components__$TabBar_TabBarButtonLayout.prototype = $extend(haxe_ui_components_ButtonLayout.prototype,{
+	repositionChildren: function() {
+		haxe_ui_components_ButtonLayout.prototype.repositionChildren.call(this);
+		var image = this._component.findComponent("tab-close-button",haxe_ui_components_Image,false);
+		if(image != null && this.get_component().get_componentWidth() > 0) {
+			image.set_top((this.get_component().get_componentHeight() / 2 - image.get_componentHeight() / 2 | 0) + this.marginTop(image) - this.marginBottom(image));
+			image.set_left(this.get_component().get_componentWidth() - image.get_componentWidth() - this.get_paddingRight() + this.marginLeft(image) - this.marginRight(image));
+		}
+	}
+	,calcAutoSize: function(exclusions) {
+		var size = haxe_ui_components_ButtonLayout.prototype.calcAutoSize.call(this,exclusions);
+		var image = this._component.findComponent("tab-close-button",haxe_ui_components_Image,false);
+		if(image != null) {
+			size.width += image.get_width() + this.get_horizontalSpacing();
+		}
+		return size;
+	}
+	,__class__: haxe_ui_components__$TabBar_TabBarButtonLayout
+});
+var haxe_ui_components_TextField = function() {
+	haxe_ui_core_InteractiveComponent.call(this);
+};
+$hxClasses["haxe.ui.components.TextField"] = haxe_ui_components_TextField;
+haxe_ui_components_TextField.__name__ = "haxe.ui.components.TextField";
+haxe_ui_components_TextField.__super__ = haxe_ui_core_InteractiveComponent;
+haxe_ui_components_TextField.prototype = $extend(haxe_ui_core_InteractiveComponent.prototype,{
+	registerBehaviours: function() {
+		haxe_ui_core_InteractiveComponent.prototype.registerBehaviours.call(this);
+		this.behaviours.register("password",haxe_ui_components__$TextField_PasswordBehaviour);
+		this.behaviours.register("maxChars",haxe_ui_components__$TextField_MaxCharsBehaviour,haxe_ui_util_Variant.fromInt(-1));
+		this.behaviours.register("restrictChars",haxe_ui_components__$TextField_RestrictCharsBehaviour);
+		this.behaviours.register("placeholder",haxe_ui_components__$TextField_PlaceholderBehaviour);
+		this.behaviours.register("text",haxe_ui_components__$TextField_TextBehaviour);
+		this.behaviours.register("htmlText",haxe_ui_components__$TextField_HtmlTextBehaviour);
+		this.behaviours.register("icon",haxe_ui_components__$TextField_IconBehaviour);
+	}
+	,get_password: function() {
+		return haxe_ui_util_Variant.toBool(this.behaviours.get("password"));
+	}
+	,set_password: function(value) {
+		this.behaviours.set("password",haxe_ui_util_Variant.fromBool(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"password"));
+		return value;
+	}
+	,get_maxChars: function() {
+		return haxe_ui_util_Variant.toInt(this.behaviours.get("maxChars"));
+	}
+	,set_maxChars: function(value) {
+		this.behaviours.set("maxChars",haxe_ui_util_Variant.fromInt(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"maxChars"));
+		return value;
+	}
+	,get_restrictChars: function() {
+		return haxe_ui_util_Variant.toString(this.behaviours.get("restrictChars"));
+	}
+	,set_restrictChars: function(value) {
+		var _g = Type.typeof(value);
+		if(_g._hx_index == 6) {
+			if(_g.c == String) {
+				if(value != null && value.indexOf("{{") != -1 && value.indexOf("}}") != -1) {
+					haxe_ui_locale_LocaleManager.get_instance().registerComponent(this,"restrictChars",null,value);
+					return value;
+				}
+			}
+		}
+		this.behaviours.set("restrictChars",haxe_ui_util_Variant.fromString(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"restrictChars"));
+		return value;
+	}
+	,get_placeholder: function() {
+		return haxe_ui_util_Variant.toString(this.behaviours.get("placeholder"));
+	}
+	,set_placeholder: function(value) {
+		var _g = Type.typeof(value);
+		if(_g._hx_index == 6) {
+			if(_g.c == String) {
+				if(value != null && value.indexOf("{{") != -1 && value.indexOf("}}") != -1) {
+					haxe_ui_locale_LocaleManager.get_instance().registerComponent(this,"placeholder",null,value);
+					return value;
+				}
+			}
+		}
+		this.behaviours.set("placeholder",haxe_ui_util_Variant.fromString(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"placeholder"));
+		return value;
+	}
+	,get_htmlText: function() {
+		return haxe_ui_util_Variant.toString(this.behaviours.get("htmlText"));
+	}
+	,set_htmlText: function(value) {
+		var _g = Type.typeof(value);
+		if(_g._hx_index == 6) {
+			if(_g.c == String) {
+				if(value != null && value.indexOf("{{") != -1 && value.indexOf("}}") != -1) {
+					haxe_ui_locale_LocaleManager.get_instance().registerComponent(this,"htmlText",null,value);
+					return value;
+				}
+			}
+		}
+		this.behaviours.set("htmlText",haxe_ui_util_Variant.fromString(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"htmlText"));
+		return value;
+	}
+	,get_icon: function() {
+		return haxe_ui_util_Variant.toString(this.behaviours.get("icon"));
+	}
+	,set_icon: function(value) {
+		var _g = Type.typeof(value);
+		if(_g._hx_index == 6) {
+			if(_g.c == String) {
+				if(value != null && value.indexOf("{{") != -1 && value.indexOf("}}") != -1) {
+					haxe_ui_locale_LocaleManager.get_instance().registerComponent(this,"icon",null,value);
+					return value;
+				}
+			}
+		}
+		this.behaviours.set("icon",haxe_ui_util_Variant.fromString(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"icon"));
+		return value;
+	}
+	,get_value: function() {
+		return this.get_text();
+	}
+	,set_value: function(value) {
+		this.set_text(value);
+		return value;
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_core_InteractiveComponent.prototype.cloneComponent.call(this);
+		c.set_password(this.get_password());
+		c.set_maxChars(this.get_maxChars());
+		if(this.get_restrictChars() != null) {
+			c.set_restrictChars(this.get_restrictChars());
+		}
+		if(this.get_placeholder() != null) {
+			c.set_placeholder(this.get_placeholder());
+		}
+		if(this.get_htmlText() != null) {
+			c.set_htmlText(this.get_htmlText());
+		}
+		if(this.get_icon() != null) {
+			c.set_icon(this.get_icon());
+		}
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_components_TextField();
+	}
+	,registerComposite: function() {
+		haxe_ui_core_InteractiveComponent.prototype.registerComposite.call(this);
+		this._internalEventsClass = haxe_ui_components__$TextField_Events;
+		this._compositeBuilderClass = haxe_ui_components__$TextField_Builder;
+		this._defaultLayoutClass = haxe_ui_components__$TextField_TextFieldLayout;
+	}
+	,__class__: haxe_ui_components_TextField
+	,__properties__: $extend(haxe_ui_core_InteractiveComponent.prototype.__properties__,{set_icon:"set_icon",get_icon:"get_icon",set_htmlText:"set_htmlText",get_htmlText:"get_htmlText",set_placeholder:"set_placeholder",get_placeholder:"get_placeholder",set_restrictChars:"set_restrictChars",get_restrictChars:"get_restrictChars",set_maxChars:"set_maxChars",get_maxChars:"get_maxChars",set_password:"set_password",get_password:"get_password"})
+});
+var haxe_ui_components__$TextField_TextFieldLayout = function() {
+	haxe_ui_layouts_DefaultLayout.call(this);
+};
+$hxClasses["haxe.ui.components._TextField.TextFieldLayout"] = haxe_ui_components__$TextField_TextFieldLayout;
+haxe_ui_components__$TextField_TextFieldLayout.__name__ = "haxe.ui.components._TextField.TextFieldLayout";
+haxe_ui_components__$TextField_TextFieldLayout.__super__ = haxe_ui_layouts_DefaultLayout;
+haxe_ui_components__$TextField_TextFieldLayout.prototype = $extend(haxe_ui_layouts_DefaultLayout.prototype,{
+	iconPosition: null
+	,get_iconPosition: function() {
+		if(this.get_component().get_style().iconPosition == null) {
+			return "left";
+		}
+		return this.get_component().get_style().iconPosition;
+	}
+	,repositionChildren: function() {
+		var icon = this.get_component().findComponent(null,haxe_ui_components_Image,false);
+		var xpos = this.get_paddingLeft();
+		if(icon != null) {
+			switch(this.get_iconPosition()) {
+			case "left":
+				icon.set_left(xpos);
+				icon.set_top(this.get_component().get_componentHeight() / 2 - icon.get_componentHeight() / 2);
+				xpos += icon.get_componentWidth() + this.get_horizontalSpacing();
+				break;
+			case "right":
+				icon.set_left(this.get_component().get_componentWidth() - icon.get_componentWidth() - this.get_paddingRight());
+				icon.set_top(this.get_component().get_componentHeight() / 2 - icon.get_componentHeight() / 2);
+				break;
+			}
+		}
+		if(this.get_component().hasTextInput() == true) {
+			this.get_component().getTextInput().set_left(xpos);
+			this.get_component().getTextInput().set_top(this.get_paddingTop() + this.get_component().get_componentHeight() / 2 - (this.get_component().getTextInput().get_height() + this.get_paddingTop() + this.get_paddingBottom()) / 2);
+		}
+	}
+	,resizeChildren: function() {
+		haxe_ui_layouts_DefaultLayout.prototype.resizeChildren.call(this);
+		if(this.get_component().hasTextInput() == true) {
+			var size = this.get_usableSize();
+			this.get_component().getTextInput().set_width(size.width);
+			this.get_component().getTextInput().set_height(size.height);
+		}
+	}
+	,calcAutoSize: function(exclusions) {
+		var size = haxe_ui_layouts_DefaultLayout.prototype.calcAutoSize.call(this,exclusions);
+		if(this.get_component().hasTextInput() == true) {
+			if(this.get_component().getTextInput().get_textWidth() + this.get_paddingLeft() + this.get_paddingRight() > size.width) {
+				size.width = this.get_component().getTextInput().get_textWidth() + this.get_paddingLeft() + this.get_paddingRight();
+			}
+			if(this.get_component().getTextInput().get_textHeight() + this.get_paddingTop() + this.get_paddingBottom() > size.height) {
+				size.height = this.get_component().getTextInput().get_textHeight() + this.get_paddingTop() + this.get_paddingBottom();
+			}
+		}
+		return size;
+	}
+	,get_usableSize: function() {
+		var size = haxe_ui_layouts_DefaultLayout.prototype.get_usableSize.call(this);
+		var icon = this.get_component().findComponent(null,haxe_ui_components_Image,false);
+		if(icon != null) {
+			size.width -= icon.get_componentWidth() + this.get_horizontalSpacing();
+		}
+		return size;
+	}
+	,__class__: haxe_ui_components__$TextField_TextFieldLayout
+	,__properties__: $extend(haxe_ui_layouts_DefaultLayout.prototype.__properties__,{get_iconPosition:"get_iconPosition"})
+});
+var haxe_ui_components__$TextField_PasswordBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._TextField.PasswordBehaviour"] = haxe_ui_components__$TextField_PasswordBehaviour;
+haxe_ui_components__$TextField_PasswordBehaviour.__name__ = "haxe.ui.components._TextField.PasswordBehaviour";
+haxe_ui_components__$TextField_PasswordBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_components__$TextField_PasswordBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	originalValue: null
+	,validateData: function() {
+		if(this.originalValue == null) {
+			this.originalValue = this._value;
+		}
+		var textfield = js_Boot.__cast(this._component , haxe_ui_components_TextField);
+		textfield.getTextInput().set_password(haxe_ui_util_Variant.toBool(this._value));
+	}
+	,__class__: haxe_ui_components__$TextField_PasswordBehaviour
+});
+var haxe_ui_components__$TextField_MaxCharsBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._TextField.MaxCharsBehaviour"] = haxe_ui_components__$TextField_MaxCharsBehaviour;
+haxe_ui_components__$TextField_MaxCharsBehaviour.__name__ = "haxe.ui.components._TextField.MaxCharsBehaviour";
+haxe_ui_components__$TextField_MaxCharsBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_components__$TextField_MaxCharsBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		var textfield = js_Boot.__cast(this._component , haxe_ui_components_TextField);
+		haxe_ui_components__$TextField_TextFieldHelper.validateText(textfield,textfield.get_text());
+	}
+	,__class__: haxe_ui_components__$TextField_MaxCharsBehaviour
+});
+var haxe_ui_components__$TextField_RestrictCharsBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._TextField.RestrictCharsBehaviour"] = haxe_ui_components__$TextField_RestrictCharsBehaviour;
+haxe_ui_components__$TextField_RestrictCharsBehaviour.__name__ = "haxe.ui.components._TextField.RestrictCharsBehaviour";
+haxe_ui_components__$TextField_RestrictCharsBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_components__$TextField_RestrictCharsBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	regexp: null
+	,validateData: function() {
+		var excludeEReg = new EReg("\\^(.-.|.)","gu");
+		var excludeChars = "";
+		var includeChars = excludeEReg.map(haxe_ui_util_Variant.toString(this._value),function(ereg) {
+			excludeChars += ereg.matched(1);
+			return "";
+		});
+		var testRegexpParts = [];
+		if(includeChars.length > 0) {
+			testRegexpParts.push("[^" + (this._value == null ? "null" : haxe_ui_util_Variant.toString(this._value)) + "]");
+		}
+		if(excludeChars.length > 0) {
+			testRegexpParts.push("[" + excludeChars + "]");
+		}
+		this.regexp = new EReg("(" + testRegexpParts.join(" | ") + ")","g");
+		var textfield = js_Boot.__cast(this._component , haxe_ui_components_TextField);
+		haxe_ui_components__$TextField_TextFieldHelper.validateText(textfield,textfield.get_text());
+	}
+	,__class__: haxe_ui_components__$TextField_RestrictCharsBehaviour
+});
+var haxe_ui_components__$TextField_PlaceholderBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._TextField.PlaceholderBehaviour"] = haxe_ui_components__$TextField_PlaceholderBehaviour;
+haxe_ui_components__$TextField_PlaceholderBehaviour.__name__ = "haxe.ui.components._TextField.PlaceholderBehaviour";
+haxe_ui_components__$TextField_PlaceholderBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_components__$TextField_PlaceholderBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		var textfield = js_Boot.__cast(this._component , haxe_ui_components_TextField);
+		haxe_ui_components__$TextField_TextFieldHelper.validateText(textfield,textfield.get_text());
+	}
+	,__class__: haxe_ui_components__$TextField_PlaceholderBehaviour
+});
+var haxe_ui_components__$TextField_TextBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._TextField.TextBehaviour"] = haxe_ui_components__$TextField_TextBehaviour;
+haxe_ui_components__$TextField_TextBehaviour.__name__ = "haxe.ui.components._TextField.TextBehaviour";
+haxe_ui_components__$TextField_TextBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_components__$TextField_TextBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		var textfield = js_Boot.__cast(this._component , haxe_ui_components_TextField);
+		haxe_ui_components__$TextField_TextFieldHelper.validateText(textfield,haxe_ui_util_Variant.toString(this._value));
+		if(this._value != null && haxe_ui_util_Variant.neq(this._value,haxe_ui_util_Variant.fromString(""))) {
+			this._value = haxe_ui_util_Variant.fromString(textfield.getTextInput().get_text());
+		}
+	}
+	,__class__: haxe_ui_components__$TextField_TextBehaviour
+});
+var haxe_ui_components__$TextField_HtmlTextBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._TextField.HtmlTextBehaviour"] = haxe_ui_components__$TextField_HtmlTextBehaviour;
+haxe_ui_components__$TextField_HtmlTextBehaviour.__name__ = "haxe.ui.components._TextField.HtmlTextBehaviour";
+haxe_ui_components__$TextField_HtmlTextBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_components__$TextField_HtmlTextBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		var textfield = js_Boot.__cast(this._component , haxe_ui_components_TextField);
+		haxe_ui_components__$TextField_TextFieldHelper.validateHtmlText(textfield,haxe_ui_util_Variant.toString(this._value));
+		if(this._value != null && haxe_ui_util_Variant.neq(this._value,haxe_ui_util_Variant.fromString(""))) {
+			this._value = haxe_ui_util_Variant.fromString(textfield.getTextInput().get_htmlText());
+		}
+	}
+	,__class__: haxe_ui_components__$TextField_HtmlTextBehaviour
+});
+var haxe_ui_components__$TextField_IconBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._TextField.IconBehaviour"] = haxe_ui_components__$TextField_IconBehaviour;
+haxe_ui_components__$TextField_IconBehaviour.__name__ = "haxe.ui.components._TextField.IconBehaviour";
+haxe_ui_components__$TextField_IconBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_components__$TextField_IconBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		var textfield = js_Boot.__cast(this._component , haxe_ui_components_TextField);
+		var icon = textfield.findComponent(null,haxe_ui_components_Image,false);
+		if((this._value == null || haxe_ui_util_Variant.get_isNull(this._value)) && icon != null) {
+			textfield.removeComponent(icon);
+		} else {
+			if(icon == null) {
+				icon = new haxe_ui_components_Image();
+				icon.set_id("textfield-icon");
+				icon.addClass("icon");
+				icon.set_scriptAccess(false);
+				textfield.addComponentAt(icon,0);
+			}
+			icon.set_resource(haxe_ui_util_Variant.fromString(haxe_ui_util_Variant.toString(this._value)));
+		}
+	}
+	,__class__: haxe_ui_components__$TextField_IconBehaviour
+});
+var haxe_ui_components__$TextField_TextFieldHelper = function() { };
+$hxClasses["haxe.ui.components._TextField.TextFieldHelper"] = haxe_ui_components__$TextField_TextFieldHelper;
+haxe_ui_components__$TextField_TextFieldHelper.__name__ = "haxe.ui.components._TextField.TextFieldHelper";
+haxe_ui_components__$TextField_TextFieldHelper.validateText = function(textfield,text) {
+	if(text == null) {
+		text = "";
+	}
+	var placeholderVisible = text.length == 0;
+	var password = (js_Boot.__cast(textfield.behaviours.find("password") , haxe_ui_components__$TextField_PasswordBehaviour)).originalValue;
+	var regexp = (js_Boot.__cast(textfield.behaviours.find("restrictChars") , haxe_ui_components__$TextField_RestrictCharsBehaviour)).regexp;
+	if(textfield.get_maxChars() > 0 && text.length > textfield.get_maxChars() && placeholderVisible == false) {
+		text = HxOverrides.substr(text,0,textfield.get_maxChars());
+	}
+	if(regexp != null) {
+		text = text.replace(regexp.r,"");
+	}
+	if(textfield.get_placeholder() != null) {
+		if(textfield.get_focus() == false) {
+			if(text.length == 0) {
+				text = textfield.get_placeholder();
+				textfield.set_password(false);
+				textfield.addClass(":empty");
+			} else if(text != textfield.get_placeholder()) {
+				textfield.set_password(haxe_ui_util_Variant.toBool(password));
+				textfield.removeClass(":empty");
+			}
+		} else {
+			textfield.removeClass(":empty");
+			if(text == textfield.get_placeholder()) {
+				text = "";
+			}
+			textfield.set_password(haxe_ui_util_Variant.toBool(password));
+		}
+	} else {
+		textfield.set_password(haxe_ui_util_Variant.toBool(password));
+		if(placeholderVisible == true) {
+			textfield.removeClass(":empty");
+		}
+	}
+	textfield.getTextInput().set_text("" + text);
+	if(!(textfield._layout == null || textfield._layoutLocked == true)) {
+		textfield.invalidateComponent("layout",false);
+	}
+};
+haxe_ui_components__$TextField_TextFieldHelper.validateHtmlText = function(textfield,htmlText) {
+	if(htmlText == null) {
+		htmlText = "";
+	}
+	var placeholderVisible = htmlText.length == 0;
+	var password = (js_Boot.__cast(textfield.behaviours.find("password") , haxe_ui_components__$TextField_PasswordBehaviour)).originalValue;
+	var regexp = (js_Boot.__cast(textfield.behaviours.find("restrictChars") , haxe_ui_components__$TextField_RestrictCharsBehaviour)).regexp;
+	if(textfield.get_maxChars() > 0 && htmlText.length > textfield.get_maxChars() && placeholderVisible == false) {
+		htmlText = HxOverrides.substr(htmlText,0,textfield.get_maxChars());
+	}
+	if(regexp != null) {
+		htmlText = htmlText.replace(regexp.r,"");
+	}
+	if(textfield.get_placeholder() != null) {
+		if(textfield.get_focus() == false) {
+			if(htmlText.length == 0) {
+				htmlText = textfield.get_placeholder();
+				textfield.set_password(false);
+				textfield.addClass(":empty");
+			} else if(htmlText != textfield.get_placeholder()) {
+				textfield.set_password(haxe_ui_util_Variant.toBool(password));
+				textfield.removeClass(":empty");
+			}
+		} else {
+			textfield.removeClass(":empty");
+			if(htmlText == textfield.get_placeholder()) {
+				htmlText = "";
+			}
+			textfield.set_password(haxe_ui_util_Variant.toBool(password));
+		}
+	} else {
+		textfield.set_password(haxe_ui_util_Variant.toBool(password));
+		if(placeholderVisible == true) {
+			textfield.removeClass(":empty");
+		}
+	}
+	textfield.getTextInput().set_htmlText("" + htmlText);
+	if(!(textfield._layout == null || textfield._layoutLocked == true)) {
+		textfield.invalidateComponent("layout",false);
+	}
+};
+var haxe_ui_components__$TextField_Events = function(textfield) {
+	haxe_ui_events_Events.call(this,textfield);
+	this._textfield = textfield;
+};
+$hxClasses["haxe.ui.components._TextField.Events"] = haxe_ui_components__$TextField_Events;
+haxe_ui_components__$TextField_Events.__name__ = "haxe.ui.components._TextField.Events";
+haxe_ui_components__$TextField_Events.__super__ = haxe_ui_events_Events;
+haxe_ui_components__$TextField_Events.prototype = $extend(haxe_ui_events_Events.prototype,{
+	_textfield: null
+	,register: function() {
+		var _gthis = this;
+		if(this._textfield.getTextInput().get_data().onChangedCallback == null) {
+			this._textfield.getTextInput().set_multiline(false);
+			this._textfield.getTextInput().get_data().onChangedCallback = function() {
+				if(_gthis._textfield.classes.indexOf(":empty") != -1 == false) {
+					_gthis._textfield.set_text(_gthis._textfield.getTextInput().get_text());
+				}
+			};
+		}
+		this.registerEvent("mousedown",$bind(this,this.onMouseDown));
+		this.registerEvent("focusin",$bind(this,this.onFocusChange));
+		this.registerEvent("focusout",$bind(this,this.onFocusChange));
+	}
+	,unregister: function() {
+		this._textfield.getTextInput().get_data().onChangedCallback = null;
+		this.unregisterEvent("mousedown",$bind(this,this.onMouseDown));
+		this.unregisterEvent("focusin",$bind(this,this.onFocusChange));
+		this.unregisterEvent("focusout",$bind(this,this.onFocusChange));
+	}
+	,onMouseDown: function(event) {
+		this._textfield.set_focus(true);
+	}
+	,onFocusChange: function(event) {
+		if(this._textfield.get_focus() == true) {
+			this._textfield.getTextInput().focus();
+		} else {
+			this._textfield.getTextInput().blur();
+		}
+		haxe_ui_components__$TextField_TextFieldHelper.validateText(this._textfield,this._textfield.get_text());
+	}
+	,__class__: haxe_ui_components__$TextField_Events
+});
+var haxe_ui_components__$TextField_Builder = function(textfield) {
+	haxe_ui_core_CompositeBuilder.call(this,textfield);
+	this._textfield = textfield;
+};
+$hxClasses["haxe.ui.components._TextField.Builder"] = haxe_ui_components__$TextField_Builder;
+haxe_ui_components__$TextField_Builder.__name__ = "haxe.ui.components._TextField.Builder";
+haxe_ui_components__$TextField_Builder.isHtml = function(v) {
+	if(v == null) {
+		return false;
+	} else {
+		return v.indexOf("<font ") != -1;
+	}
+};
+haxe_ui_components__$TextField_Builder.__super__ = haxe_ui_core_CompositeBuilder;
+haxe_ui_components__$TextField_Builder.prototype = $extend(haxe_ui_core_CompositeBuilder.prototype,{
+	_textfield: null
+	,applyStyle: function(style) {
+		if(style.icon != null) {
+			this._textfield.set_icon(style.icon);
+		}
+		if(this._textfield.hasTextInput() == true) {
+			this._textfield.getTextInput().set_textStyle(style);
+			var tmp;
+			if((style.contentType == "auto" || style.contentType == "html") && this._textfield.getTextInput().get_supportsHtml()) {
+				var v = Std.string(this._textfield.get_text());
+				tmp = v == null ? false : v.indexOf("<font ") != -1;
+			} else {
+				tmp = false;
+			}
+			if(tmp) {
+				this._textfield.set_htmlText(this._textfield.get_text());
+			}
+		}
+	}
+	,__class__: haxe_ui_components__$TextField_Builder
+});
+var haxe_ui_components_VerticalScroll = function() {
+	haxe_ui_components_Scroll.call(this);
+};
+$hxClasses["haxe.ui.components.VerticalScroll"] = haxe_ui_components_VerticalScroll;
+haxe_ui_components_VerticalScroll.__name__ = "haxe.ui.components.VerticalScroll";
+haxe_ui_components_VerticalScroll.__super__ = haxe_ui_components_Scroll;
+haxe_ui_components_VerticalScroll.prototype = $extend(haxe_ui_components_Scroll.prototype,{
+	registerBehaviours: function() {
+		haxe_ui_components_Scroll.prototype.registerBehaviours.call(this);
+		this.behaviours.register("posFromCoord",haxe_ui_components__$VerticalScroll_PosFromCoord);
+		this.behaviours.register("applyPageFromCoord",haxe_ui_components__$VerticalScroll_ApplyPageFromCoord);
+	}
+	,createChildren: function() {
+		haxe_ui_components_Scroll.prototype.createChildren.call(this);
+		if(this.get_componentHeight() <= 0) {
+			this.set_componentHeight(150);
+		}
+	}
+	,createDefaults: function() {
+		haxe_ui_components_Scroll.prototype.createDefaults.call(this);
+		this._defaultLayoutClass = haxe_ui_components__$VerticalScroll_VerticalScrollLayout;
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_components_Scroll.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_components_VerticalScroll();
+	}
+	,__class__: haxe_ui_components_VerticalScroll
+});
+var haxe_ui_components__$VerticalScroll_PosFromCoord = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._VerticalScroll.PosFromCoord"] = haxe_ui_components__$VerticalScroll_PosFromCoord;
+haxe_ui_components__$VerticalScroll_PosFromCoord.__name__ = "haxe.ui.components._VerticalScroll.PosFromCoord";
+haxe_ui_components__$VerticalScroll_PosFromCoord.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_components__$VerticalScroll_PosFromCoord.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	call: function(pos) {
+		var p = js_Boot.__cast(pos , haxe_ui_geom_Point);
+		var scroll = js_Boot.__cast(this._component , haxe_ui_components_Scroll);
+		var deinc = this._component.findComponent("scroll-deinc-button");
+		var thumb = this._component.findComponent("scroll-thumb-button");
+		var ypos = p.y;
+		var minY = 0;
+		if(deinc != null && deinc.get_hidden() == false) {
+			minY = deinc.get_height() + scroll.get_layout().get_verticalSpacing();
+		}
+		var maxY = scroll.get_layout().get_usableHeight() - thumb.get_height();
+		if(deinc != null && deinc.get_hidden() == false) {
+			maxY += deinc.get_height() + scroll.get_layout().get_verticalSpacing();
+		}
+		if(ypos < minY) {
+			ypos = minY;
+		} else if(ypos > maxY) {
+			ypos = maxY;
+		}
+		var ucy = scroll.get_layout().get_usableHeight();
+		ucy -= thumb.get_height();
+		var m = scroll.get_max() - scroll.get_min() | 0;
+		var v = ypos - minY;
+		var value = scroll.get_min() + v / ucy * m;
+		return haxe_ui_util_Variant.fromFloat(value);
+	}
+	,__class__: haxe_ui_components__$VerticalScroll_PosFromCoord
+});
+var haxe_ui_components__$VerticalScroll_ApplyPageFromCoord = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.components._VerticalScroll.ApplyPageFromCoord"] = haxe_ui_components__$VerticalScroll_ApplyPageFromCoord;
+haxe_ui_components__$VerticalScroll_ApplyPageFromCoord.__name__ = "haxe.ui.components._VerticalScroll.ApplyPageFromCoord";
+haxe_ui_components__$VerticalScroll_ApplyPageFromCoord.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_components__$VerticalScroll_ApplyPageFromCoord.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	call: function(pos) {
+		var p = js_Boot.__cast(pos , haxe_ui_geom_Point);
+		var scroll = js_Boot.__cast(this._component , haxe_ui_components_Scroll);
+		var thumb = this._component.findComponent("scroll-thumb-button");
+		if(p.y < thumb.get_screenTop()) {
+			scroll.set_pos(scroll.get_pos() - scroll.get_pageSize());
+		} else if(p.y > thumb.get_screenTop() + thumb.get_height()) {
+			scroll.set_pos(scroll.get_pos() + scroll.get_pageSize());
+		}
+		return null;
+	}
+	,__class__: haxe_ui_components__$VerticalScroll_ApplyPageFromCoord
+});
+var haxe_ui_components__$VerticalScroll_VerticalScrollLayout = function() {
+	haxe_ui_layouts_DefaultLayout.call(this);
+};
+$hxClasses["haxe.ui.components._VerticalScroll.VerticalScrollLayout"] = haxe_ui_components__$VerticalScroll_VerticalScrollLayout;
+haxe_ui_components__$VerticalScroll_VerticalScrollLayout.__name__ = "haxe.ui.components._VerticalScroll.VerticalScrollLayout";
+haxe_ui_components__$VerticalScroll_VerticalScrollLayout.__super__ = haxe_ui_layouts_DefaultLayout;
+haxe_ui_components__$VerticalScroll_VerticalScrollLayout.prototype = $extend(haxe_ui_layouts_DefaultLayout.prototype,{
+	resizeChildren: function() {
+		haxe_ui_layouts_DefaultLayout.prototype.resizeChildren.call(this);
+		var scroll = js_Boot.__cast(this.get_component() , haxe_ui_components_Scroll);
+		var thumb = this.get_component().findComponent("scroll-thumb-button");
+		if(thumb != null) {
+			var m = scroll.get_max() - scroll.get_min();
+			var ucy = this.get_usableHeight();
+			var thumbHeight = scroll.get_pageSize() / m * ucy;
+			if(thumbHeight < this.get_innerWidth()) {
+				thumbHeight = this.get_innerWidth();
+			} else if(thumbHeight > ucy) {
+				thumbHeight = ucy;
+			}
+			if(thumbHeight > 0 && isNaN(thumbHeight) == false) {
+				thumb.set_height(thumbHeight);
+			}
+		}
+	}
+	,repositionChildren: function() {
+		haxe_ui_layouts_DefaultLayout.prototype.repositionChildren.call(this);
+		var deinc = this.get_component().findComponent("scroll-deinc-button");
+		var inc = this.get_component().findComponent("scroll-inc-button");
+		if(inc != null && this.hidden(inc) == false) {
+			inc.set_top(this.get_component().get_height() - inc.get_height() - this.get_paddingBottom());
+		}
+		var scroll = js_Boot.__cast(this.get_component() , haxe_ui_components_Scroll);
+		var thumb = this.get_component().findComponent("scroll-thumb-button");
+		if(thumb != null) {
+			var m = scroll.get_max() - scroll.get_min();
+			var u = this.get_usableHeight();
+			u -= thumb.get_height();
+			var y = (scroll.get_pos() - scroll.get_min()) / m * u;
+			y += this.get_paddingTop();
+			if(deinc != null && this.hidden(deinc) == false) {
+				y += deinc.get_height() + this.get_verticalSpacing();
+			}
+			thumb.set_left(Math.round(thumb.get_left()));
+			thumb.set_top(y);
+		}
+	}
+	,get_usableHeight: function() {
+		var ucy = this.get_innerHeight();
+		var deinc = this.get_component().findComponent("scroll-deinc-button");
+		var inc = this.get_component().findComponent("scroll-inc-button");
+		if(deinc != null && this.hidden(deinc) == false) {
+			ucy -= deinc.get_height() + this.get_verticalSpacing();
+		}
+		if(inc != null && this.hidden(inc) == false) {
+			ucy -= inc.get_height() + this.get_verticalSpacing();
+		}
+		return ucy;
+	}
+	,__class__: haxe_ui_components__$VerticalScroll_VerticalScrollLayout
+});
 var haxe_ui_containers_Absolute = function() {
 	haxe_ui_containers_Box.call(this);
 	this.set_layout(new haxe_ui_layouts_AbsoluteLayout());
@@ -10517,6 +15541,168 @@ haxe_ui_containers_Absolute.prototype = $extend(haxe_ui_containers_Box.prototype
 		return new haxe_ui_containers_Absolute();
 	}
 	,__class__: haxe_ui_containers_Absolute
+});
+var haxe_ui_containers_CalendarView = function() {
+	haxe_ui_containers_VBox.call(this);
+};
+$hxClasses["haxe.ui.containers.CalendarView"] = haxe_ui_containers_CalendarView;
+haxe_ui_containers_CalendarView.__name__ = "haxe.ui.containers.CalendarView";
+haxe_ui_containers_CalendarView.__super__ = haxe_ui_containers_VBox;
+haxe_ui_containers_CalendarView.prototype = $extend(haxe_ui_containers_VBox.prototype,{
+	registerComposite: function() {
+		haxe_ui_containers_VBox.prototype.registerComposite.call(this);
+		this._internalEventsClass = haxe_ui_containers__$CalendarView_Events;
+		this._compositeBuilderClass = haxe_ui_containers__$CalendarView_Builder;
+	}
+	,registerBehaviours: function() {
+		haxe_ui_containers_VBox.prototype.registerBehaviours.call(this);
+		this.behaviours.register("selectedDate",haxe_ui_containers__$CalendarView_SelectedDateBehaviour);
+	}
+	,get_selectedDate: function() {
+		return haxe_ui_util_Variant.toDate(this.behaviours.get("selectedDate"));
+	}
+	,set_selectedDate: function(value) {
+		this.behaviours.set("selectedDate",haxe_ui_util_Variant.fromDate(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"selectedDate"));
+		return value;
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_containers_VBox.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_containers_CalendarView();
+	}
+	,__class__: haxe_ui_containers_CalendarView
+	,__properties__: $extend(haxe_ui_containers_VBox.prototype.__properties__,{set_selectedDate:"set_selectedDate",get_selectedDate:"get_selectedDate"})
+});
+var haxe_ui_containers__$CalendarView_SelectedDateBehaviour = function(component) {
+	haxe_ui_behaviours_DefaultBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._CalendarView.SelectedDateBehaviour"] = haxe_ui_containers__$CalendarView_SelectedDateBehaviour;
+haxe_ui_containers__$CalendarView_SelectedDateBehaviour.__name__ = "haxe.ui.containers._CalendarView.SelectedDateBehaviour";
+haxe_ui_containers__$CalendarView_SelectedDateBehaviour.__super__ = haxe_ui_behaviours_DefaultBehaviour;
+haxe_ui_containers__$CalendarView_SelectedDateBehaviour.prototype = $extend(haxe_ui_behaviours_DefaultBehaviour.prototype,{
+	get: function() {
+		return haxe_ui_util_Variant.fromDate(this._component.findComponent(null,haxe_ui_components_Calendar).get_selectedDate());
+	}
+	,set: function(value) {
+		this._component.findComponent(null,haxe_ui_components_Calendar).set_selectedDate(haxe_ui_util_Variant.toDate(value));
+	}
+	,__class__: haxe_ui_containers__$CalendarView_SelectedDateBehaviour
+});
+var haxe_ui_containers__$CalendarView_Events = function(target) {
+	haxe_ui_events_Events.call(this,target);
+};
+$hxClasses["haxe.ui.containers._CalendarView.Events"] = haxe_ui_containers__$CalendarView_Events;
+haxe_ui_containers__$CalendarView_Events.__name__ = "haxe.ui.containers._CalendarView.Events";
+haxe_ui_containers__$CalendarView_Events.__super__ = haxe_ui_events_Events;
+haxe_ui_containers__$CalendarView_Events.prototype = $extend(haxe_ui_events_Events.prototype,{
+	register: function() {
+		var button = this._target.findComponent("prev-month");
+		if(button != null && button.hasEvent("click") == false) {
+			button.registerEvent("click",$bind(this,this.onPrevMonth));
+		}
+		var button = this._target.findComponent("next-month");
+		if(button != null && button.hasEvent("click") == false) {
+			button.registerEvent("click",$bind(this,this.onNextMonth));
+		}
+		var stepper = this._target.findComponent("current-year");
+		if(stepper != null && stepper.hasEvent("change") == false) {
+			stepper.registerEvent("change",$bind(this,this.onYearChange));
+		}
+		if(this._target.findComponent(null,haxe_ui_components_Calendar).hasEvent("datechange",$bind(this,this.onDateChange)) == false) {
+			this._target.findComponent(null,haxe_ui_components_Calendar).registerEvent("datechange",$bind(this,this.onDateChange));
+		}
+		if(this._target.findComponent(null,haxe_ui_components_Calendar).hasEvent("change",$bind(this,this.onCalendarChange)) == false) {
+			this._target.findComponent(null,haxe_ui_components_Calendar).registerEvent("change",$bind(this,this.onCalendarChange));
+		}
+		this.registerEvent("mousewheel",$bind(this,this.onMouseWheel));
+	}
+	,onPrevMonth: function(event) {
+		this._target.findComponent(null,haxe_ui_components_Calendar).previousMonth();
+	}
+	,onNextMonth: function(event) {
+		this._target.findComponent(null,haxe_ui_components_Calendar).nextMonth();
+	}
+	,onYearChange: function(event) {
+		var calendar = this._target.findComponent(null,haxe_ui_components_Calendar);
+		var stepper = this._target.findComponent("current-year");
+		if(stepper.get_pos() > calendar.get_date().getFullYear()) {
+			calendar.nextYear();
+		} else if(stepper.get_pos() < calendar.get_date().getFullYear()) {
+			calendar.previousYear();
+		}
+	}
+	,onDateChange: function(event) {
+		var calendar = this._target.findComponent(null,haxe_ui_components_Calendar);
+		var monthName = haxe_ui_containers_CalendarView.MONTH_NAMES[calendar.get_date().getMonth()];
+		this._target.findComponent("current-month",haxe_ui_components_Label).set_text(monthName + "  " + calendar.get_date().getFullYear());
+	}
+	,onCalendarChange: function(event) {
+		var calendar = this._target.findComponent(null,haxe_ui_components_Calendar);
+		var stepper = this._target.findComponent("current-year");
+		stepper.set_pos(calendar.get_selectedDate().getFullYear());
+		this._target.dispatch(new haxe_ui_events_UIEvent("change"));
+	}
+	,onMouseWheel: function(event) {
+		if(event.delta >= 1) {
+			this._target.findComponent(null,haxe_ui_components_Calendar).nextMonth();
+		} else {
+			this._target.findComponent(null,haxe_ui_components_Calendar).previousMonth();
+		}
+	}
+	,__class__: haxe_ui_containers__$CalendarView_Events
+});
+var haxe_ui_containers__$CalendarView_Builder = function(calendarView) {
+	haxe_ui_core_CompositeBuilder.call(this,calendarView);
+	this._calendarView = calendarView;
+};
+$hxClasses["haxe.ui.containers._CalendarView.Builder"] = haxe_ui_containers__$CalendarView_Builder;
+haxe_ui_containers__$CalendarView_Builder.__name__ = "haxe.ui.containers._CalendarView.Builder";
+haxe_ui_containers__$CalendarView_Builder.__super__ = haxe_ui_core_CompositeBuilder;
+haxe_ui_containers__$CalendarView_Builder.prototype = $extend(haxe_ui_core_CompositeBuilder.prototype,{
+	_calendarView: null
+	,create: function() {
+		var box = new haxe_ui_containers_Box();
+		box.set_percentWidth(100);
+		var button = new haxe_ui_components_Button();
+		button.set_id("prev-month");
+		box.addComponent(button);
+		var hbox = new haxe_ui_containers_HBox();
+		hbox.set_horizontalAlign("center");
+		hbox.set_verticalAlign("center");
+		var label = new haxe_ui_components_Label();
+		label.set_id("current-month");
+		var now = new Date();
+		label.set_text(haxe_ui_containers_CalendarView.MONTH_NAMES[now.getMonth()] + "  " + now.getFullYear());
+		hbox.addComponent(label);
+		var stepper = new haxe_ui_components_Stepper();
+		stepper.set_id("current-year");
+		stepper.set_min(0);
+		stepper.set_max(now.getFullYear() + 1000);
+		stepper.set_pos(now.getFullYear());
+		stepper.set_repeater(false);
+		hbox.addComponent(stepper);
+		box.addComponent(hbox);
+		var button = new haxe_ui_components_Button();
+		button.set_id("next-month");
+		button.set_horizontalAlign("right");
+		box.addComponent(button);
+		this._calendarView.addComponent(box);
+		var calendar = new haxe_ui_components_Calendar();
+		this._calendarView.addComponent(calendar);
+	}
+	,__class__: haxe_ui_containers__$CalendarView_Builder
 });
 var haxe_ui_containers_HBox = function() {
 	haxe_ui_containers_Box.call(this);
@@ -10560,105 +15746,40 @@ haxe_ui_containers_HBox.prototype = $extend(haxe_ui_containers_Box.prototype,{
 	,__class__: haxe_ui_containers_HBox
 	,__properties__: $extend(haxe_ui_containers_Box.prototype.__properties__,{set_continuous:"set_continuous",get_continuous:"get_continuous"})
 });
-var haxe_ui_core_ComponentTextBehaviour = function(component) {
-	haxe_ui_behaviours_DefaultBehaviour.call(this,component);
+var haxe_ui_containers_IVirtualContainer = function() { };
+$hxClasses["haxe.ui.containers.IVirtualContainer"] = haxe_ui_containers_IVirtualContainer;
+haxe_ui_containers_IVirtualContainer.__name__ = "haxe.ui.containers.IVirtualContainer";
+haxe_ui_containers_IVirtualContainer.__isInterface__ = true;
+haxe_ui_containers_IVirtualContainer.prototype = {
+	get_itemWidth: null
+	,set_itemWidth: null
+	,get_itemHeight: null
+	,set_itemHeight: null
+	,get_itemCount: null
+	,set_itemCount: null
+	,get_variableItemSize: null
+	,set_variableItemSize: null
+	,get_virtual: null
+	,set_virtual: null
+	,get_hscrollPos: null
+	,set_hscrollPos: null
+	,get_hscrollMax: null
+	,set_hscrollMax: null
+	,get_hscrollPageSize: null
+	,set_hscrollPageSize: null
+	,get_vscrollPos: null
+	,set_vscrollPos: null
+	,get_vscrollMax: null
+	,set_vscrollMax: null
+	,get_vscrollPageSize: null
+	,set_vscrollPageSize: null
+	,get_itemRenderer: null
+	,set_itemRenderer: null
+	,get_itemRendererClass: null
+	,set_itemRendererClass: null
+	,__class__: haxe_ui_containers_IVirtualContainer
+	,__properties__: {set_itemRendererClass:"set_itemRendererClass",get_itemRendererClass:"get_itemRendererClass",set_itemRenderer:"set_itemRenderer",get_itemRenderer:"get_itemRenderer",set_vscrollPageSize:"set_vscrollPageSize",get_vscrollPageSize:"get_vscrollPageSize",set_vscrollMax:"set_vscrollMax",get_vscrollMax:"get_vscrollMax",set_vscrollPos:"set_vscrollPos",get_vscrollPos:"get_vscrollPos",set_hscrollPageSize:"set_hscrollPageSize",get_hscrollPageSize:"get_hscrollPageSize",set_hscrollMax:"set_hscrollMax",get_hscrollMax:"get_hscrollMax",set_hscrollPos:"set_hscrollPos",get_hscrollPos:"get_hscrollPos",set_virtual:"set_virtual",get_virtual:"get_virtual",set_variableItemSize:"set_variableItemSize",get_variableItemSize:"get_variableItemSize",set_itemCount:"set_itemCount",get_itemCount:"get_itemCount",set_itemHeight:"set_itemHeight",get_itemHeight:"get_itemHeight",set_itemWidth:"set_itemWidth",get_itemWidth:"get_itemWidth"}
 };
-$hxClasses["haxe.ui.core.ComponentTextBehaviour"] = haxe_ui_core_ComponentTextBehaviour;
-haxe_ui_core_ComponentTextBehaviour.__name__ = "haxe.ui.core.ComponentTextBehaviour";
-haxe_ui_core_ComponentTextBehaviour.__super__ = haxe_ui_behaviours_DefaultBehaviour;
-haxe_ui_core_ComponentTextBehaviour.prototype = $extend(haxe_ui_behaviours_DefaultBehaviour.prototype,{
-	set: function(value) {
-		if(haxe_ui_util_Variant.eq(value,this._value)) {
-			return;
-		}
-		this._value = value;
-		haxe_ui_behaviours_DefaultBehaviour.prototype.set.call(this,value);
-	}
-	,__class__: haxe_ui_core_ComponentTextBehaviour
-});
-var haxe_ui_core_ComponentDisabledBehaviour = function(component) {
-	haxe_ui_behaviours_DataBehaviour.call(this,component);
-	this._value = haxe_ui_util_Variant.fromBool(false);
-};
-$hxClasses["haxe.ui.core.ComponentDisabledBehaviour"] = haxe_ui_core_ComponentDisabledBehaviour;
-haxe_ui_core_ComponentDisabledBehaviour.__name__ = "haxe.ui.core.ComponentDisabledBehaviour";
-haxe_ui_core_ComponentDisabledBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
-haxe_ui_core_ComponentDisabledBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
-	validateData: function() {
-		if(this._value != null && haxe_ui_util_Variant.get_isNull(this._value) == false) {
-			this._component.disableInteractivity(haxe_ui_util_Variant.toBool(this._value),true,true);
-		}
-	}
-	,__class__: haxe_ui_core_ComponentDisabledBehaviour
-});
-var haxe_ui_core_ComponentValueBehaviour = function(component) {
-	haxe_ui_behaviours_ValueBehaviour.call(this,component);
-};
-$hxClasses["haxe.ui.core.ComponentValueBehaviour"] = haxe_ui_core_ComponentValueBehaviour;
-haxe_ui_core_ComponentValueBehaviour.__name__ = "haxe.ui.core.ComponentValueBehaviour";
-haxe_ui_core_ComponentValueBehaviour.__super__ = haxe_ui_behaviours_ValueBehaviour;
-haxe_ui_core_ComponentValueBehaviour.prototype = $extend(haxe_ui_behaviours_ValueBehaviour.prototype,{
-	set: function(value) {
-		if(haxe_ui_util_Variant.eq(value,this._value)) {
-			return;
-		}
-		this._value = value;
-		this._component.set_text(haxe_ui_util_Variant.toString(value));
-	}
-	,get: function() {
-		return this._value;
-	}
-	,getDynamic: function() {
-		return haxe_ui_util_Variant.toDynamic(this._value);
-	}
-	,__class__: haxe_ui_core_ComponentValueBehaviour
-});
-var haxe_ui_core_ComponentToolTipBehaviour = function(component) {
-	haxe_ui_behaviours_DataBehaviour.call(this,component);
-};
-$hxClasses["haxe.ui.core.ComponentToolTipBehaviour"] = haxe_ui_core_ComponentToolTipBehaviour;
-haxe_ui_core_ComponentToolTipBehaviour.__name__ = "haxe.ui.core.ComponentToolTipBehaviour";
-haxe_ui_core_ComponentToolTipBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
-haxe_ui_core_ComponentToolTipBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
-	validateData: function() {
-		if(this._value == null || haxe_ui_util_Variant.get_isNull(this._value)) {
-			haxe_ui_tooltips_ToolTipManager.get_instance().unregisterTooltip(this._component);
-		} else {
-			haxe_ui_tooltips_ToolTipManager.get_instance().registerTooltip(this._component,{ tipData : haxe_ui_util_Variant.toDynamic(this._value), renderer : this._component.get_tooltipRenderer()});
-		}
-	}
-	,setDynamic: function(value) {
-		if(value == null) {
-			haxe_ui_tooltips_ToolTipManager.get_instance().unregisterTooltip(this._component);
-		} else {
-			haxe_ui_tooltips_ToolTipManager.get_instance().registerTooltip(this._component,{ tipData : value, renderer : this._component.get_tooltipRenderer()});
-		}
-	}
-	,getDynamic: function() {
-		var options = haxe_ui_tooltips_ToolTipManager.get_instance().getTooltipOptions(this._component);
-		if(options == null) {
-			return null;
-		}
-		return options.tipData;
-	}
-	,__class__: haxe_ui_core_ComponentToolTipBehaviour
-});
-var haxe_ui_core_ComponentToolTipRendererBehaviour = function(component) {
-	haxe_ui_behaviours_DataBehaviour.call(this,component);
-};
-$hxClasses["haxe.ui.core.ComponentToolTipRendererBehaviour"] = haxe_ui_core_ComponentToolTipRendererBehaviour;
-haxe_ui_core_ComponentToolTipRendererBehaviour.__name__ = "haxe.ui.core.ComponentToolTipRendererBehaviour";
-haxe_ui_core_ComponentToolTipRendererBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
-haxe_ui_core_ComponentToolTipRendererBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
-	validateData: function() {
-		if(this._value == null || haxe_ui_util_Variant.get_isNull(this._value)) {
-			haxe_ui_tooltips_ToolTipManager.get_instance().updateTooltipRenderer(this._component,null);
-		} else {
-			haxe_ui_tooltips_ToolTipManager.get_instance().updateTooltipRenderer(this._component,haxe_ui_util_Variant.toComponent(this._value));
-		}
-	}
-	,__class__: haxe_ui_core_ComponentToolTipRendererBehaviour
-});
 var haxe_ui_core_IScrollView = function() { };
 $hxClasses["haxe.ui.core.IScrollView"] = haxe_ui_core_IScrollView;
 haxe_ui_core_IScrollView.__name__ = "haxe.ui.core.IScrollView";
@@ -10667,155 +15788,2483 @@ haxe_ui_core_IScrollView.prototype = {
 	ensureVisible: null
 	,__class__: haxe_ui_core_IScrollView
 };
-var haxe_ui_core_ImageDisplay = function() {
-	this._isValidating = false;
-	this._isAllInvalid = false;
-	this._invalidationFlags = new haxe_ds_StringMap();
-	haxe_ui_backend_ImageDisplayImpl.call(this);
+var haxe_ui_containers_ScrollView = function() {
+	haxe_ui_core_Component.call(this);
 };
-$hxClasses["haxe.ui.core.ImageDisplay"] = haxe_ui_core_ImageDisplay;
-haxe_ui_core_ImageDisplay.__name__ = "haxe.ui.core.ImageDisplay";
-haxe_ui_core_ImageDisplay.__super__ = haxe_ui_backend_ImageDisplayImpl;
-haxe_ui_core_ImageDisplay.prototype = $extend(haxe_ui_backend_ImageDisplayImpl.prototype,{
-	_invalidationFlags: null
-	,_isAllInvalid: null
-	,_isValidating: null
-	,get_left: function() {
-		return this._left;
-	}
-	,set_left: function(value) {
-		if(value == this._left) {
-			return value;
+$hxClasses["haxe.ui.containers.ScrollView"] = haxe_ui_containers_ScrollView;
+haxe_ui_containers_ScrollView.__name__ = "haxe.ui.containers.ScrollView";
+haxe_ui_containers_ScrollView.__interfaces__ = [haxe_ui_core_IScrollView];
+haxe_ui_containers_ScrollView.__super__ = haxe_ui_core_Component;
+haxe_ui_containers_ScrollView.prototype = $extend(haxe_ui_core_Component.prototype,{
+	validateComponentInternal: function(nextFrame) {
+		if(nextFrame == null) {
+			nextFrame = true;
 		}
-		this._left = value;
-		this.invalidateComponent("position");
-		return value;
-	}
-	,get_top: function() {
-		return this._top;
-	}
-	,set_top: function(value) {
-		if(value == this._top) {
-			return value;
-		}
-		this._top = value;
-		this.invalidateComponent("position");
-		return value;
-	}
-	,set_imageWidth: function(value) {
-		if(this._imageWidth == value || value <= 0) {
-			return value;
-		}
-		this._imageWidth = value;
-		this.invalidateComponent("display");
-		return value;
-	}
-	,get_imageWidth: function() {
-		return this._imageWidth;
-	}
-	,set_imageHeight: function(value) {
-		if(this._imageHeight == value || value <= 0) {
-			return value;
-		}
-		this._imageHeight = value;
-		this.invalidateComponent("display");
-		return value;
-	}
-	,get_imageHeight: function() {
-		return this._imageHeight;
-	}
-	,get_imageInfo: function() {
-		return this._imageInfo;
-	}
-	,set_imageInfo: function(value) {
-		if(value == this._imageInfo) {
-			return value;
-		}
-		this._imageInfo = value;
-		this._imageWidth = this._imageInfo.width;
-		this._imageHeight = this._imageInfo.height;
-		this.invalidateComponent("data");
-		this.invalidateComponent("display");
-		return value;
-	}
-	,get_imageClipRect: function() {
-		return this._imageClipRect;
-	}
-	,set_imageClipRect: function(value) {
-		this._imageClipRect = value;
-		this.invalidateComponent("display");
-		return value;
-	}
-	,isComponentInvalid: function(flag) {
-		if(flag == null) {
-			flag = "all";
-		}
-		if(this._isAllInvalid == true) {
-			return true;
-		}
-		if(flag == "all") {
-			var h = this._invalidationFlags.h;
-			var value_h = h;
-			var value_keys = Object.keys(h);
-			var value_length = value_keys.length;
-			var value_current = 0;
-			while(value_current < value_length) {
-				var value = value_h[value_keys[value_current++]];
-				return true;
-			}
-			return false;
-		}
-		return Object.prototype.hasOwnProperty.call(this._invalidationFlags.h,flag);
-	}
-	,invalidateComponent: function(flag) {
-		if(flag == null) {
-			flag = "all";
-		}
-		if(flag == "all") {
-			this._isAllInvalid = true;
-			this.parentComponent.invalidateComponent("imageDisplay");
-		} else if(!Object.prototype.hasOwnProperty.call(this._invalidationFlags.h,flag)) {
-			this._invalidationFlags.h[flag] = true;
-			this.parentComponent.invalidateComponent("imageDisplay");
-		}
-	}
-	,validateComponent: function() {
-		if(this._isValidating == true || this.isComponentInvalid() == false) {
+		if(this.get_native() == true) {
+			haxe_ui_core_Component.prototype.validateComponentInternal.call(this,nextFrame);
 			return;
 		}
-		this._isValidating = true;
-		this.handleValidate();
-		var h = this._invalidationFlags.h;
-		var flag_h = h;
-		var flag_keys = Object.keys(h);
-		var flag_length = flag_keys.length;
-		var flag_current = 0;
-		while(flag_current < flag_length) {
-			var flag = flag_keys[flag_current++];
-			var _this = this._invalidationFlags;
-			if(Object.prototype.hasOwnProperty.call(_this.h,flag)) {
-				delete(_this.h[flag]);
+		var scrollInvalid = this.isComponentInvalid("scroll");
+		var layoutInvalid = this.isComponentInvalid("layout");
+		haxe_ui_core_Component.prototype.validateComponentInternal.call(this,nextFrame);
+		if(scrollInvalid || layoutInvalid) {
+			(js_Boot.__cast(this._compositeBuilder , haxe_ui_containers_ScrollViewBuilder)).checkScrolls();
+			(js_Boot.__cast(this._compositeBuilder , haxe_ui_containers_ScrollViewBuilder)).updateScrollRect();
+		}
+	}
+	,ensureVisible: function(component) {
+		return;
+	}
+	,get_isScroller: function() {
+		return true;
+	}
+	,registerComposite: function() {
+		haxe_ui_core_Component.prototype.registerComposite.call(this);
+		this._internalEventsClass = haxe_ui_containers_ScrollViewEvents;
+		this._compositeBuilderClass = haxe_ui_containers_ScrollViewBuilder;
+		this._defaultLayoutClass = haxe_ui_layouts_ScrollViewLayout;
+	}
+	,registerBehaviours: function() {
+		haxe_ui_core_Component.prototype.registerBehaviours.call(this);
+		this.behaviours.register("virtual",haxe_ui_containers__$ScrollView_Virtual);
+		this.behaviours.register("contentLayoutName",haxe_ui_containers__$ScrollView_ContentLayoutName,haxe_ui_util_Variant.fromString("vertical"));
+		this.behaviours.register("contentWidth",haxe_ui_containers__$ScrollView_ContentWidth);
+		this.behaviours.register("percentContentWidth",haxe_ui_containers__$ScrollView_PercentContentWidth);
+		this.behaviours.register("contentHeight",haxe_ui_containers__$ScrollView_ContentHeight);
+		this.behaviours.register("percentContentHeight",haxe_ui_containers__$ScrollView_PercentContentHeight);
+		this.behaviours.register("hscrollPos",haxe_ui_containers__$ScrollView_HScrollPos);
+		this.behaviours.register("hscrollMax",haxe_ui_containers__$ScrollView_HScrollMax);
+		this.behaviours.register("hscrollPageSize",haxe_ui_containers__$ScrollView_HScrollPageSize);
+		this.behaviours.register("vscrollPos",haxe_ui_containers__$ScrollView_VScrollPos);
+		this.behaviours.register("vscrollMax",haxe_ui_containers__$ScrollView_VScrollMax);
+		this.behaviours.register("vscrollPageSize",haxe_ui_containers__$ScrollView_VScrollPageSize);
+		this.behaviours.register("scrollMode",haxe_ui_containers__$ScrollView_ScrollModeBehaviour,haxe_ui_util_Variant.fromString("drag"));
+		this.behaviours.register("contents",haxe_ui_containers__$ScrollView_GetContents);
+		this.behaviours.register("autoHideScrolls",haxe_ui_behaviours_DefaultBehaviour);
+	}
+	,get_virtual: function() {
+		return haxe_ui_util_Variant.toBool(this.behaviours.get("virtual"));
+	}
+	,set_virtual: function(value) {
+		this.behaviours.set("virtual",haxe_ui_util_Variant.fromBool(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"virtual"));
+		return value;
+	}
+	,get_contentLayoutName: function() {
+		return haxe_ui_util_Variant.toString(this.behaviours.get("contentLayoutName"));
+	}
+	,set_contentLayoutName: function(value) {
+		var _g = Type.typeof(value);
+		if(_g._hx_index == 6) {
+			if(_g.c == String) {
+				if(value != null && value.indexOf("{{") != -1 && value.indexOf("}}") != -1) {
+					haxe_ui_locale_LocaleManager.get_instance().registerComponent(this,"contentLayoutName",null,value);
+					return value;
+				}
 			}
 		}
-		this._isAllInvalid = false;
-		this._isValidating = false;
+		this.behaviours.set("contentLayoutName",haxe_ui_util_Variant.fromString(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"contentLayoutName"));
+		return value;
 	}
-	,handleValidate: function() {
-		var dataInvalid = this.isComponentInvalid("data");
-		var positionInvalid = this.isComponentInvalid("position");
-		var displayInvalid = this.isComponentInvalid("display");
-		if(dataInvalid) {
-			this.validateData();
+	,get_contentWidth: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("contentWidth"));
+	}
+	,set_contentWidth: function(value) {
+		this.behaviours.set("contentWidth",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"contentWidth"));
+		return value;
+	}
+	,get_percentContentWidth: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("percentContentWidth"));
+	}
+	,set_percentContentWidth: function(value) {
+		this.behaviours.set("percentContentWidth",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"percentContentWidth"));
+		return value;
+	}
+	,get_contentHeight: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("contentHeight"));
+	}
+	,set_contentHeight: function(value) {
+		this.behaviours.set("contentHeight",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"contentHeight"));
+		return value;
+	}
+	,get_percentContentHeight: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("percentContentHeight"));
+	}
+	,set_percentContentHeight: function(value) {
+		this.behaviours.set("percentContentHeight",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"percentContentHeight"));
+		return value;
+	}
+	,get_hscrollPos: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("hscrollPos"));
+	}
+	,set_hscrollPos: function(value) {
+		this.behaviours.set("hscrollPos",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"hscrollPos"));
+		return value;
+	}
+	,get_hscrollMax: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("hscrollMax"));
+	}
+	,set_hscrollMax: function(value) {
+		this.behaviours.set("hscrollMax",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"hscrollMax"));
+		return value;
+	}
+	,get_hscrollPageSize: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("hscrollPageSize"));
+	}
+	,set_hscrollPageSize: function(value) {
+		this.behaviours.set("hscrollPageSize",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"hscrollPageSize"));
+		return value;
+	}
+	,get_vscrollPos: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("vscrollPos"));
+	}
+	,set_vscrollPos: function(value) {
+		this.behaviours.set("vscrollPos",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"vscrollPos"));
+		return value;
+	}
+	,get_vscrollMax: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("vscrollMax"));
+	}
+	,set_vscrollMax: function(value) {
+		this.behaviours.set("vscrollMax",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"vscrollMax"));
+		return value;
+	}
+	,get_vscrollPageSize: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("vscrollPageSize"));
+	}
+	,set_vscrollPageSize: function(value) {
+		this.behaviours.set("vscrollPageSize",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"vscrollPageSize"));
+		return value;
+	}
+	,get_scrollMode: function() {
+		return haxe_ui_util_Variant.toString(this.behaviours.get("scrollMode"));
+	}
+	,set_scrollMode: function(value) {
+		this.behaviours.set("scrollMode",haxe_ui_util_Variant.fromString(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"scrollMode"));
+		return value;
+	}
+	,get_contents: function() {
+		return haxe_ui_util_Variant.toComponent(this.behaviours.get("contents"));
+	}
+	,set_contents: function(value) {
+		this.behaviours.set("contents",haxe_ui_util_Variant.fromComponent(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"contents"));
+		return value;
+	}
+	,get_autoHideScrolls: function() {
+		return haxe_ui_util_Variant.toBool(this.behaviours.get("autoHideScrolls"));
+	}
+	,set_autoHideScrolls: function(value) {
+		this.behaviours.set("autoHideScrolls",haxe_ui_util_Variant.fromBool(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"autoHideScrolls"));
+		return value;
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_core_Component.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
 		}
-		if(positionInvalid) {
-			this.validatePosition();
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_containers_ScrollView();
+	}
+	,__class__: haxe_ui_containers_ScrollView
+	,__properties__: $extend(haxe_ui_core_Component.prototype.__properties__,{set_autoHideScrolls:"set_autoHideScrolls",get_autoHideScrolls:"get_autoHideScrolls",set_contents:"set_contents",get_contents:"get_contents",set_scrollMode:"set_scrollMode",get_scrollMode:"get_scrollMode",set_vscrollPageSize:"set_vscrollPageSize",get_vscrollPageSize:"get_vscrollPageSize",set_vscrollMax:"set_vscrollMax",get_vscrollMax:"get_vscrollMax",set_vscrollPos:"set_vscrollPos",get_vscrollPos:"get_vscrollPos",set_hscrollPageSize:"set_hscrollPageSize",get_hscrollPageSize:"get_hscrollPageSize",set_hscrollMax:"set_hscrollMax",get_hscrollMax:"get_hscrollMax",set_hscrollPos:"set_hscrollPos",get_hscrollPos:"get_hscrollPos",set_percentContentHeight:"set_percentContentHeight",get_percentContentHeight:"get_percentContentHeight",set_contentHeight:"set_contentHeight",get_contentHeight:"get_contentHeight",set_percentContentWidth:"set_percentContentWidth",get_percentContentWidth:"get_percentContentWidth",set_contentWidth:"set_contentWidth",get_contentWidth:"get_contentWidth",set_contentLayoutName:"set_contentLayoutName",get_contentLayoutName:"get_contentLayoutName",set_virtual:"set_virtual",get_virtual:"get_virtual"})
+});
+var haxe_ui_containers_ListView = function() {
+	haxe_ui_containers_ScrollView.call(this);
+};
+$hxClasses["haxe.ui.containers.ListView"] = haxe_ui_containers_ListView;
+haxe_ui_containers_ListView.__name__ = "haxe.ui.containers.ListView";
+haxe_ui_containers_ListView.__interfaces__ = [haxe_ui_containers_IVirtualContainer,haxe_ui_core_IDataComponent];
+haxe_ui_containers_ListView.__super__ = haxe_ui_containers_ScrollView;
+haxe_ui_containers_ListView.prototype = $extend(haxe_ui_containers_ScrollView.prototype,{
+	_itemRendererClass: null
+	,get_itemRendererClass: function() {
+		return this._itemRendererClass;
+	}
+	,set_itemRendererClass: function(value) {
+		if(this._itemRendererClass != value) {
+			this._itemRendererClass = value;
+			if(!(this._layout == null || this._layoutLocked == true)) {
+				this.invalidateComponent("layout",false);
+			}
 		}
-		if(displayInvalid) {
-			this.validateDisplay();
+		return value;
+	}
+	,_itemRenderer: null
+	,get_itemRenderer: function() {
+		return this._itemRenderer;
+	}
+	,set_itemRenderer: function(value) {
+		if(this._itemRenderer != value) {
+			this._itemRenderer = value;
+			if(!(this._layout == null || this._layoutLocked == true)) {
+				this.invalidateComponent("layout",false);
+			}
+		}
+		return value;
+	}
+	,registerBehaviours: function() {
+		haxe_ui_containers_ScrollView.prototype.registerBehaviours.call(this);
+		this.behaviours.register("dataSource",haxe_ui_containers__$ListView_DataSourceBehaviour);
+		this.behaviours.register("itemWidth",haxe_ui_behaviours_LayoutBehaviour,haxe_ui_util_Variant.fromInt(-1));
+		this.behaviours.register("itemHeight",haxe_ui_behaviours_LayoutBehaviour,haxe_ui_util_Variant.fromInt(-1));
+		this.behaviours.register("itemCount",haxe_ui_behaviours_LayoutBehaviour,haxe_ui_util_Variant.fromInt(-1));
+		this.behaviours.register("variableItemSize",haxe_ui_behaviours_LayoutBehaviour,haxe_ui_util_Variant.fromBool(false));
+		this.behaviours.register("selectedIndex",haxe_ui_containers__$ListView_SelectedIndexBehaviour,haxe_ui_util_Variant.fromInt(-1));
+		this.behaviours.register("selectedItem",haxe_ui_containers__$ListView_SelectedItemBehaviour);
+		this.behaviours.register("selectedIndices",haxe_ui_containers__$ListView_SelectedIndicesBehaviour);
+		this.behaviours.register("selectedItems",haxe_ui_containers__$ListView_SelectedItemsBehaviour);
+		this.behaviours.register("selectionMode",haxe_ui_containers__$ListView_SelectionModeBehaviour,haxe_ui_util_Variant.fromString("one-item"));
+		this.behaviours.register("longPressSelectionTime",haxe_ui_behaviours_DefaultBehaviour,haxe_ui_util_Variant.fromInt(500));
+	}
+	,get_dataSource: function() {
+		return haxe_ui_util_Variant.toDataSource(this.behaviours.get("dataSource"));
+	}
+	,set_dataSource: function(value) {
+		this.behaviours.set("dataSource",haxe_ui_util_Variant.fromDataSource(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"dataSource"));
+		return value;
+	}
+	,get_itemWidth: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("itemWidth"));
+	}
+	,set_itemWidth: function(value) {
+		this.behaviours.set("itemWidth",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"itemWidth"));
+		return value;
+	}
+	,get_itemHeight: function() {
+		return haxe_ui_util_Variant.toFloat(this.behaviours.get("itemHeight"));
+	}
+	,set_itemHeight: function(value) {
+		this.behaviours.set("itemHeight",haxe_ui_util_Variant.fromFloat(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"itemHeight"));
+		return value;
+	}
+	,get_itemCount: function() {
+		return haxe_ui_util_Variant.toInt(this.behaviours.get("itemCount"));
+	}
+	,set_itemCount: function(value) {
+		this.behaviours.set("itemCount",haxe_ui_util_Variant.fromInt(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"itemCount"));
+		return value;
+	}
+	,get_variableItemSize: function() {
+		return haxe_ui_util_Variant.toBool(this.behaviours.get("variableItemSize"));
+	}
+	,set_variableItemSize: function(value) {
+		this.behaviours.set("variableItemSize",haxe_ui_util_Variant.fromBool(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"variableItemSize"));
+		return value;
+	}
+	,get_selectedIndex: function() {
+		return haxe_ui_util_Variant.toInt(this.behaviours.get("selectedIndex"));
+	}
+	,set_selectedIndex: function(value) {
+		this.behaviours.set("selectedIndex",haxe_ui_util_Variant.fromInt(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"selectedIndex"));
+		return value;
+	}
+	,get_selectedItem: function() {
+		return this.behaviours.getDynamic("selectedItem");
+	}
+	,set_selectedItem: function(value) {
+		this.behaviours.setDynamic("selectedItem",value);
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"selectedItem"));
+		return value;
+	}
+	,get_selectedIndices: function() {
+		return haxe_ui_util_Variant.toArray(this.behaviours.get("selectedIndices"));
+	}
+	,set_selectedIndices: function(value) {
+		this.behaviours.set("selectedIndices",haxe_ui_util_Variant.fromArray(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"selectedIndices"));
+		return value;
+	}
+	,get_selectedItems: function() {
+		return haxe_ui_util_Variant.toArray(this.behaviours.get("selectedItems"));
+	}
+	,set_selectedItems: function(value) {
+		this.behaviours.set("selectedItems",haxe_ui_util_Variant.fromArray(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"selectedItems"));
+		return value;
+	}
+	,get_selectionMode: function() {
+		return haxe_ui_util_Variant.toString(this.behaviours.get("selectionMode"));
+	}
+	,set_selectionMode: function(value) {
+		this.behaviours.set("selectionMode",haxe_ui_util_Variant.fromString(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"selectionMode"));
+		return value;
+	}
+	,get_longPressSelectionTime: function() {
+		return haxe_ui_util_Variant.toInt(this.behaviours.get("longPressSelectionTime"));
+	}
+	,set_longPressSelectionTime: function(value) {
+		this.behaviours.set("longPressSelectionTime",haxe_ui_util_Variant.fromInt(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"longPressSelectionTime"));
+		return value;
+	}
+	,get_value: function() {
+		return this.get_selectedIndex();
+	}
+	,set_value: function(value) {
+		this.set_selectedIndex(value);
+		return value;
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_containers_ScrollView.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_containers_ListView();
+	}
+	,registerComposite: function() {
+		haxe_ui_containers_ScrollView.prototype.registerComposite.call(this);
+		this._internalEventsClass = haxe_ui_containers_ListViewEvents;
+		this._compositeBuilderClass = haxe_ui_containers__$ListView_ListViewBuilder;
+		this._defaultLayoutClass = haxe_ui_layouts_VerticalVirtualLayout;
+	}
+	,__onComponentEvent: null
+	,onComponentEvent: null
+	,set_onComponentEvent: function(value) {
+		if(this.__onComponentEvent != null) {
+			this.unregisterEvent("itemComponentEvent",this.__onComponentEvent);
+			this.__onComponentEvent = null;
+		}
+		if(value != null) {
+			this.__onComponentEvent = value;
+			this.registerEvent("itemComponentEvent",value);
+		}
+		return value;
+	}
+	,__class__: haxe_ui_containers_ListView
+	,__properties__: $extend(haxe_ui_containers_ScrollView.prototype.__properties__,{set_onComponentEvent:"set_onComponentEvent",set_longPressSelectionTime:"set_longPressSelectionTime",get_longPressSelectionTime:"get_longPressSelectionTime",set_selectionMode:"set_selectionMode",get_selectionMode:"get_selectionMode",set_selectedItems:"set_selectedItems",get_selectedItems:"get_selectedItems",set_selectedIndices:"set_selectedIndices",get_selectedIndices:"get_selectedIndices",set_selectedItem:"set_selectedItem",get_selectedItem:"get_selectedItem",set_selectedIndex:"set_selectedIndex",get_selectedIndex:"get_selectedIndex",set_variableItemSize:"set_variableItemSize",get_variableItemSize:"get_variableItemSize",set_itemCount:"set_itemCount",get_itemCount:"get_itemCount",set_itemHeight:"set_itemHeight",get_itemHeight:"get_itemHeight",set_itemWidth:"set_itemWidth",get_itemWidth:"get_itemWidth",set_dataSource:"set_dataSource",get_dataSource:"get_dataSource",set_itemRenderer:"set_itemRenderer",get_itemRenderer:"get_itemRenderer",set_itemRendererClass:"set_itemRendererClass",get_itemRendererClass:"get_itemRendererClass"})
+});
+var haxe_ui_containers_ScrollViewEvents = function(scrollview) {
+	this._fadeTimer = null;
+	this._containerEventsPaused = false;
+	this._lastMousePos = null;
+	this._movementThreshold = 3;
+	this._inertia = null;
+	haxe_ui_events_Events.call(this,scrollview);
+	this._scrollview = scrollview;
+};
+$hxClasses["haxe.ui.containers.ScrollViewEvents"] = haxe_ui_containers_ScrollViewEvents;
+haxe_ui_containers_ScrollViewEvents.__name__ = "haxe.ui.containers.ScrollViewEvents";
+haxe_ui_containers_ScrollViewEvents.__super__ = haxe_ui_events_Events;
+haxe_ui_containers_ScrollViewEvents.prototype = $extend(haxe_ui_events_Events.prototype,{
+	_scrollview: null
+	,register: function() {
+		var contents = this._scrollview.findComponent("scrollview-contents",null,false,"css");
+		if(contents != null && contents.hasEvent("resize",$bind(this,this.onContentsResized)) == false) {
+			contents.registerEvent("resize",$bind(this,this.onContentsResized));
+		}
+		var hscroll = this._scrollview.findComponent(null,haxe_ui_components_HorizontalScroll,false);
+		if(hscroll != null && hscroll.hasEvent("change",$bind(this,this.onHScroll)) == false) {
+			hscroll.registerEvent("change",$bind(this,this.onHScroll));
+		}
+		var vscroll = this._scrollview.findComponent(null,haxe_ui_components_VerticalScroll,false);
+		if(vscroll != null && vscroll.hasEvent("change",$bind(this,this.onVScroll)) == false) {
+			vscroll.registerEvent("change",$bind(this,this.onVScroll));
+		}
+		if(this._scrollview.get_scrollMode() == "drag" || this._scrollview.get_scrollMode() == "inertial") {
+			this.registerEvent("mousedown",$bind(this,this.onMouseDown));
+		} else if(this.hasEvent("mousedown",$bind(this,this.onMouseDown)) == false) {
+			this.unregisterEvent("mousedown",$bind(this,this.onMouseDown));
+		}
+		if(this._scrollview.hasEvent("shown") == false) {
+			this.registerEvent("shown",$bind(this,this.onShown));
+		}
+		this.registerEvent("mousewheel",$bind(this,this.onMouseWheel));
+	}
+	,unregister: function() {
+		var contents = this._scrollview.findComponent("scrollview-contents",null,false,"css");
+		if(contents != null) {
+			contents.unregisterEvent("resize",$bind(this,this.onContentsResized));
+		}
+		var hscroll = this._scrollview.findComponent(null,haxe_ui_components_HorizontalScroll,false);
+		if(hscroll != null) {
+			hscroll.unregisterEvent("change",$bind(this,this.onHScroll));
+		}
+		var vscroll = this._scrollview.findComponent(null,haxe_ui_components_VerticalScroll,false);
+		if(vscroll != null) {
+			vscroll.unregisterEvent("change",$bind(this,this.onVScroll));
+		}
+		this.unregisterEvent("mousedown",$bind(this,this.onMouseDown));
+		this.unregisterEvent("mousewheel",$bind(this,this.onMouseWheel));
+		this.unregisterEvent("shown",$bind(this,this.onShown));
+	}
+	,onShown: function(event) {
+		var _this = this._scrollview;
+		if(!(_this._layout == null || _this._layoutLocked == true)) {
+			_this.invalidateComponent("layout",false);
+		}
+		var hscroll = this._scrollview.findComponent(null,haxe_ui_components_HorizontalScroll,false);
+		if(hscroll != null) {
+			if(!(hscroll._layout == null || hscroll._layoutLocked == true)) {
+				hscroll.invalidateComponent("layout",false);
+			}
+		}
+		var vscroll = this._scrollview.findComponent(null,haxe_ui_components_VerticalScroll,false);
+		if(vscroll != null) {
+			if(!(vscroll._layout == null || vscroll._layoutLocked == true)) {
+				vscroll.invalidateComponent("layout",false);
+			}
 		}
 	}
-	,__class__: haxe_ui_core_ImageDisplay
-	,__properties__: {set_imageClipRect:"set_imageClipRect",get_imageClipRect:"get_imageClipRect",set_imageInfo:"set_imageInfo",get_imageInfo:"get_imageInfo",set_imageHeight:"set_imageHeight",get_imageHeight:"get_imageHeight",set_imageWidth:"set_imageWidth",get_imageWidth:"get_imageWidth",set_top:"set_top",get_top:"get_top",set_left:"set_left",get_left:"get_left"}
+	,onContentsResized: function(event) {
+		this._scrollview.invalidateComponent("scroll");
+	}
+	,onHScroll: function(event) {
+		this._scrollview.invalidateComponent("scroll");
+		this._target.dispatch(new haxe_ui_events_ScrollEvent("scrollchange"));
+	}
+	,onVScroll: function(event) {
+		this._scrollview.invalidateComponent("scroll");
+		this._target.dispatch(new haxe_ui_events_ScrollEvent("scrollchange"));
+	}
+	,_offset: null
+	,_inertia: null
+	,onMouseDown: function(event) {
+		var hscroll = this._scrollview.findComponent(null,haxe_ui_components_HorizontalScroll,false);
+		var vscroll = this._scrollview.findComponent(null,haxe_ui_components_VerticalScroll,false);
+		if(hscroll == null && vscroll == null) {
+			return;
+		}
+		this._scrollview.addClass(":down");
+		this._lastMousePos = new haxe_ui_geom_Point(event.screenX,event.screenY);
+		var componentOffset = this._scrollview.getComponentOffset();
+		if(hscroll != null && hscroll.hitTest(event.screenX - componentOffset.x,event.screenY - componentOffset.y) == true) {
+			return;
+		}
+		if(vscroll != null && vscroll.hitTest(event.screenX - componentOffset.x,event.screenY - componentOffset.y) == true) {
+			return;
+		}
+		var under = this._scrollview.findComponentsUnderPoint(event.screenX - componentOffset.x,event.screenY - componentOffset.y);
+		var _g = 0;
+		while(_g < under.length) {
+			var c = under[_g];
+			++_g;
+			if(((c) instanceof haxe_ui_components_TextField)) {
+				return;
+			}
+		}
+		this._offset = new haxe_ui_geom_Point();
+		if(hscroll != null) {
+			var tmp = hscroll.get_pos();
+			this._offset.x = tmp + event.screenX;
+		}
+		if(vscroll != null) {
+			var tmp = vscroll.get_pos();
+			this._offset.y = tmp + event.screenY;
+		}
+		if(this._scrollview.get_scrollMode() == "inertial") {
+			if(this._inertia == null) {
+				this._inertia = { screen : new haxe_ui_geom_Point(), target : new haxe_ui_geom_Point(), amplitude : new haxe_ui_geom_Point(), direction : new haxe_ui_geom_Point(), timestamp : 0};
+			}
+			this._inertia.target.x = this._scrollview.get_hscrollPos();
+			this._inertia.target.y = this._scrollview.get_vscrollPos();
+			this._inertia.amplitude.x = 0;
+			this._inertia.amplitude.y = 0;
+			this._inertia.screen.x = event.screenX;
+			this._inertia.screen.y = event.screenY;
+			this._inertia.timestamp = HxOverrides.now() / 1000;
+		}
+		haxe_ui_core_Screen.get_instance().registerEvent("mousemove",$bind(this,this.onMouseMove));
+		haxe_ui_core_Screen.get_instance().registerEvent("mouseup",$bind(this,this.onMouseUp));
+	}
+	,_movementThreshold: null
+	,_lastMousePos: null
+	,onMouseMove: function(event) {
+		var hscroll = this._scrollview.findComponent(null,haxe_ui_components_HorizontalScroll,false);
+		if(hscroll != null) {
+			hscroll.set_pos(this._offset.x - event.screenX);
+			var distX = Math.abs(event.screenX - this._lastMousePos.x);
+			if(distX > haxe_ui_Toolkit.get_scaleX()) {
+				this.pauseContainerEvents();
+			}
+		}
+		var vscroll = this._scrollview.findComponent(null,haxe_ui_components_VerticalScroll,false);
+		if(vscroll != null) {
+			vscroll.set_pos(this._offset.y - event.screenY);
+			var distY = Math.abs(event.screenY - this._lastMousePos.y);
+			if(distY > haxe_ui_Toolkit.get_scaleY()) {
+				this.pauseContainerEvents();
+			}
+		}
+		this._lastMousePos = new haxe_ui_geom_Point(event.screenX,event.screenY);
+	}
+	,_containerEventsPaused: null
+	,pauseContainerEvents: function() {
+		if(this._containerEventsPaused == true) {
+			return;
+		}
+		this._containerEventsPaused = true;
+		this.onContainerEventsStatusChanged();
+	}
+	,resumeContainerEvents: function() {
+		if(this._containerEventsPaused == false) {
+			return;
+		}
+		this._containerEventsPaused = false;
+		this.onContainerEventsStatusChanged();
+	}
+	,onContainerEventsStatusChanged: function() {
+		this._scrollview.findComponent("scrollview-contents",haxe_ui_core_Component,true,"css").disableInteractivity(this._containerEventsPaused);
+		if(this._containerEventsPaused == true) {
+			this._scrollview.findComponent("scrollview-contents",haxe_ui_core_Component,true,"css").removeClass(":hover",true,true);
+		}
+		var hscroll = this._scrollview.findComponent(null,haxe_ui_components_HorizontalScroll,false);
+		var vscroll = this._scrollview.findComponent(null,haxe_ui_components_VerticalScroll,false);
+		if(hscroll != null || vscroll != null) {
+			if(this._scrollview.get_autoHideScrolls() == true) {
+				if(this._containerEventsPaused == true) {
+					if(hscroll != null) {
+						hscroll.fadeIn();
+					}
+					if(vscroll != null) {
+						vscroll.fadeIn();
+					}
+				} else {
+					if(hscroll != null) {
+						hscroll.fadeOut();
+					}
+					if(vscroll != null) {
+						vscroll.fadeOut();
+					}
+				}
+			}
+		}
+	}
+	,onMouseUp: function(event) {
+		haxe_ui_core_Screen.get_instance().unregisterEvent("mousemove",$bind(this,this.onMouseMove));
+		haxe_ui_core_Screen.get_instance().unregisterEvent("mouseup",$bind(this,this.onMouseUp));
+		if(this._scrollview.get_scrollMode() == "inertial") {
+			var now = HxOverrides.now() / 1000;
+			var elapsed = (now - this._inertia.timestamp) * 1000;
+			var deltaX = Math.abs(this._inertia.screen.x - event.screenX);
+			var deltaY = Math.abs(this._inertia.screen.y - event.screenY);
+			this._inertia.direction.x = this._inertia.screen.x - event.screenX < 0 ? 0 : 1;
+			var velocityX = deltaX / elapsed;
+			var v = 1000 * deltaX / (1 + elapsed);
+			velocityX = 0.8 * v + 0.2 * velocityX;
+			this._inertia.direction.y = this._inertia.screen.y - event.screenY < 0 ? 0 : 1;
+			var velocityY = deltaY / elapsed;
+			var v = 1000 * deltaY / (1 + elapsed);
+			velocityY = 0.8 * v + 0.2 * velocityY;
+			if(velocityX <= 75 && velocityY <= 75) {
+				this.dispatch(new haxe_ui_events_ScrollEvent("scrollstop"));
+				haxe_ui_Toolkit.callLater($bind(this,this.resumeContainerEvents));
+				return;
+			}
+			this._inertia.timestamp = HxOverrides.now() / 1000;
+			var hscroll = this._scrollview.findComponent(null,haxe_ui_components_HorizontalScroll,false);
+			if(hscroll != null) {
+				this._inertia.amplitude.x = 0.8 * velocityX;
+			}
+			if(this._inertia.direction.x == 0) {
+				var tmp = this._scrollview.get_hscrollPos() - this._inertia.amplitude.x;
+				this._inertia.target.x = Math.round(tmp);
+			} else {
+				var tmp = this._scrollview.get_hscrollPos() + this._inertia.amplitude.x;
+				this._inertia.target.x = Math.round(tmp);
+			}
+			var vscroll = this._scrollview.findComponent(null,haxe_ui_components_VerticalScroll,false);
+			if(vscroll != null) {
+				this._inertia.amplitude.y = 0.8 * velocityY;
+			}
+			if(this._inertia.direction.y == 0) {
+				var tmp = this._scrollview.get_vscrollPos() - this._inertia.amplitude.y;
+				this._inertia.target.y = Math.round(tmp);
+			} else {
+				var tmp = this._scrollview.get_vscrollPos() + this._inertia.amplitude.y;
+				this._inertia.target.y = Math.round(tmp);
+			}
+			if(this._scrollview.get_hscrollPos() == this._inertia.target.x && this._scrollview.get_vscrollPos() == this._inertia.target.y) {
+				this.dispatch(new haxe_ui_events_ScrollEvent("scrollstop"));
+				haxe_ui_Toolkit.callLater($bind(this,this.resumeContainerEvents));
+				return;
+			}
+			if(this._scrollview.get_hscrollPos() == this._inertia.target.x) {
+				this._inertia.amplitude.x = 0;
+			}
+			if(this._scrollview.get_vscrollPos() == this._inertia.target.y) {
+				this._inertia.amplitude.y = 0;
+			}
+			haxe_ui_Toolkit.callLater($bind(this,this.inertialScroll));
+		} else {
+			this._scrollview.removeClass(":down");
+			this.dispatch(new haxe_ui_events_ScrollEvent("scrollstop"));
+			haxe_ui_Toolkit.callLater($bind(this,this.resumeContainerEvents));
+		}
+	}
+	,inertialScroll: function() {
+		var elapsed = (HxOverrides.now() / 1000 - this._inertia.timestamp) * 1000;
+		var finishedX = false;
+		if(this._inertia.amplitude.x != 0) {
+			var deltaX = -this._inertia.amplitude.x * Math.exp(-elapsed / 325);
+			if(deltaX > 0.5 || deltaX < -0.5) {
+				var oldPos = this._scrollview.get_hscrollPos();
+				var newPos = 0;
+				if(this._inertia.direction.x == 0) {
+					newPos = this._inertia.target.x - deltaX;
+				} else {
+					newPos = this._inertia.target.x + deltaX;
+				}
+				if(newPos < 0) {
+					newPos = 0;
+				} else if(newPos > this._scrollview.get_hscrollMax()) {
+					newPos = this._scrollview.get_hscrollMax();
+				}
+				this._scrollview.set_hscrollPos(newPos);
+				finishedX = newPos == oldPos || newPos == 0 || newPos == this._scrollview.get_hscrollMax();
+			} else {
+				finishedX = true;
+			}
+		} else {
+			finishedX = true;
+		}
+		var finishedY = false;
+		if(this._inertia.amplitude.y != 0) {
+			var deltaY = -this._inertia.amplitude.y * Math.exp(-elapsed / 325);
+			if(deltaY > 0.5 || deltaY < -0.5) {
+				var oldPos = this._scrollview.get_vscrollPos();
+				var newPos = 0;
+				if(this._inertia.direction.y == 0) {
+					newPos = this._inertia.target.y - deltaY;
+				} else {
+					newPos = this._inertia.target.y + deltaY;
+				}
+				if(newPos < 0) {
+					newPos = 0;
+				} else if(newPos > this._scrollview.get_vscrollMax()) {
+					newPos = this._scrollview.get_vscrollMax();
+				}
+				this._scrollview.set_vscrollPos(newPos);
+				finishedY = newPos == oldPos || newPos == 0 || newPos == this._scrollview.get_vscrollMax();
+			} else {
+				finishedY = true;
+			}
+		} else {
+			finishedY = true;
+		}
+		if(finishedX == true && finishedY == true) {
+			this.dispatch(new haxe_ui_events_ScrollEvent("scrollstop"));
+			haxe_ui_Toolkit.callLater($bind(this,this.resumeContainerEvents));
+		} else {
+			haxe_ui_Toolkit.callLater($bind(this,this.inertialScroll));
+		}
+	}
+	,_fadeTimer: null
+	,onMouseWheel: function(event) {
+		var _gthis = this;
+		var vscroll = this._scrollview.findComponent(null,haxe_ui_components_VerticalScroll,false);
+		if(vscroll != null) {
+			if(this._scrollview.get_autoHideScrolls() == true && this._fadeTimer == null) {
+				vscroll.fadeIn();
+			}
+			event.cancel();
+			var amount = 50;
+			if(event.delta > 0) {
+				vscroll.set_pos(vscroll.get_pos() - amount);
+			} else if(event.delta < 0) {
+				vscroll.set_pos(vscroll.get_pos() + amount);
+			}
+			if(this._scrollview.get_autoHideScrolls() == true) {
+				if(this._fadeTimer != null) {
+					this._fadeTimer.stop();
+					this._fadeTimer = null;
+				}
+				this._fadeTimer = new haxe_ui_util_Timer(300,function() {
+					vscroll.fadeOut();
+					_gthis._fadeTimer.stop();
+					_gthis._fadeTimer = null;
+				});
+			}
+		}
+	}
+	,__class__: haxe_ui_containers_ScrollViewEvents
+});
+var haxe_ui_containers_ListViewEvents = function(listview) {
+	haxe_ui_containers_ScrollViewEvents.call(this,listview);
+	this._listview = listview;
+};
+$hxClasses["haxe.ui.containers.ListViewEvents"] = haxe_ui_containers_ListViewEvents;
+haxe_ui_containers_ListViewEvents.__name__ = "haxe.ui.containers.ListViewEvents";
+haxe_ui_containers_ListViewEvents.__super__ = haxe_ui_containers_ScrollViewEvents;
+haxe_ui_containers_ListViewEvents.prototype = $extend(haxe_ui_containers_ScrollViewEvents.prototype,{
+	_listview: null
+	,register: function() {
+		haxe_ui_containers_ScrollViewEvents.prototype.register.call(this);
+		this.registerEvent("scrollchange",$bind(this,this.onScrollChange));
+		this.registerEvent("rendererCreated",$bind(this,this.onRendererCreated));
+		this.registerEvent("rendererDestroyed",$bind(this,this.onRendererDestroyed));
+	}
+	,unregister: function() {
+		haxe_ui_containers_ScrollViewEvents.prototype.unregister.call(this);
+		this.unregisterEvent("scrollchange",$bind(this,this.onScrollChange));
+		this.unregisterEvent("rendererCreated",$bind(this,this.onRendererCreated));
+		this.unregisterEvent("rendererDestroyed",$bind(this,this.onRendererDestroyed));
+	}
+	,onScrollChange: function(e) {
+		if(this._listview.get_virtual() == true) {
+			var _this = this._listview;
+			if(!(_this._layout == null || _this._layoutLocked == true)) {
+				_this.invalidateComponent("layout",false);
+			}
+		}
+	}
+	,onRendererCreated: function(e) {
+		var instance = js_Boot.__cast(e.data , haxe_ui_core_ItemRenderer);
+		instance.registerEvent("mousedown",$bind(this,this.onRendererMouseDown));
+		instance.registerEvent("click",$bind(this,this.onRendererClick));
+		if(this._listview.get_selectedIndices().indexOf(instance.itemIndex) != -1) {
+			var builder = js_Boot.__cast(this._listview._compositeBuilder , haxe_ui_containers__$ListView_ListViewBuilder);
+			builder.addItemRendererClass(instance,":selected");
+		}
+	}
+	,onRendererDestroyed: function(e) {
+		var instance = js_Boot.__cast(e.data , haxe_ui_core_ItemRenderer);
+		instance.unregisterEvent("mousedown",$bind(this,this.onRendererMouseDown));
+		instance.unregisterEvent("click",$bind(this,this.onRendererClick));
+		if(this._listview.get_selectedIndices().indexOf(instance.itemIndex) != -1) {
+			var builder = js_Boot.__cast(this._listview._compositeBuilder , haxe_ui_containers__$ListView_ListViewBuilder);
+			builder.addItemRendererClass(instance,":selected",false);
+		}
+	}
+	,onRendererMouseDown: function(e) {
+		if(this._listview.get_selectionMode() == "multiple-long-press") {
+			if(this._listview.get_selectedIndices().length == 0) {
+				this.startLongPressSelection(e);
+			}
+		} else if(this._listview.classes.indexOf(":mobile") != -1 == false) {
+			e.target.addClass(":hover");
+		}
+	}
+	,startLongPressSelection: function(e) {
+		var _gthis = this;
+		var timerClick = null;
+		var currentMouseX = e.screenX;
+		var currentMouseY = e.screenY;
+		var renderer = js_Boot.__cast(e.target , haxe_ui_core_ItemRenderer);
+		var __onMouseMove = null;
+		var __onMouseUp = null;
+		var __onMouseClick = null;
+		__onMouseMove = function(_e) {
+			currentMouseX = _e.screenX;
+			currentMouseY = _e.screenY;
+		};
+		__onMouseUp = function(_e) {
+			if(timerClick != null) {
+				timerClick.stop();
+				timerClick = null;
+			}
+			renderer.get_screen().unregisterEvent("mousemove",__onMouseMove);
+			renderer.get_screen().unregisterEvent("mouseup",__onMouseUp);
+		};
+		__onMouseClick = function(_e) {
+			_e.cancel();
+			renderer.unregisterEvent("click",__onMouseClick);
+		};
+		renderer.get_screen().registerEvent("mousemove",__onMouseMove);
+		renderer.get_screen().registerEvent("mouseup",__onMouseUp);
+		timerClick = haxe_Timer.delay(function() {
+			if(timerClick != null) {
+				timerClick = null;
+				var timerClick1;
+				if(renderer.hitTest(currentMouseX,currentMouseY)) {
+					var x1 = e.screenX;
+					var y1 = e.screenY;
+					timerClick1 = Math.sqrt((x1 - currentMouseX) * (x1 - currentMouseX) + (y1 - currentMouseY) * (y1 - currentMouseY)) < 2 * haxe_ui_Toolkit.pixelsPerRem;
+				} else {
+					timerClick1 = false;
+				}
+				if(timerClick1) {
+					_gthis.toggleSelection(renderer);
+					renderer.registerEvent("click",__onMouseClick,1);
+				}
+			}
+		},this._listview.get_longPressSelectionTime());
+	}
+	,onContainerEventsStatusChanged: function() {
+		haxe_ui_containers_ScrollViewEvents.prototype.onContainerEventsStatusChanged.call(this);
+		if(this._containerEventsPaused == true) {
+			this._scrollview.findComponent("listview-contents",haxe_ui_core_Component,true,"css").removeClass(":hover",true,true);
+		} else {
+			var tmp = this._lastMousePos != null;
+		}
+	}
+	,onRendererClick: function(e) {
+		if(this._containerEventsPaused == true) {
+			return;
+		}
+		var components = e.target.findComponentsUnderPoint(e.screenX,e.screenY);
+		var _g = 0;
+		while(_g < components.length) {
+			var component = components[_g];
+			++_g;
+			if(((component) instanceof haxe_ui_core_InteractiveComponent) && (js_Boot.__cast(component , haxe_ui_core_InteractiveComponent)).get_allowInteraction() == true) {
+				return;
+			}
+		}
+		var renderer = js_Boot.__cast(e.target , haxe_ui_core_ItemRenderer);
+		switch(this._listview.get_selectionMode()) {
+		case "disabled":
+			break;
+		case "multiple-click-modifier-key":case "multiple-modifier-key":
+			if(e.ctrlKey == true) {
+				this.toggleSelection(renderer);
+			} else if(e.shiftKey == true) {
+				var selectedIndices = this._listview.get_selectedIndices();
+				var fromIndex = selectedIndices.length > 0 ? selectedIndices[selectedIndices.length - 1] : 0;
+				var toIndex = renderer.itemIndex;
+				if(fromIndex < toIndex) {
+					var _g = 0;
+					while(_g < selectedIndices.length) {
+						var i = selectedIndices[_g];
+						++_g;
+						if(i < fromIndex) {
+							fromIndex = i;
+						}
+					}
+				} else {
+					var tmp = fromIndex;
+					fromIndex = toIndex;
+					toIndex = tmp;
+				}
+				this.selectRange(fromIndex,toIndex);
+			} else if(this._listview.get_selectionMode() == "multiple-click-modifier-key") {
+				this._listview.set_selectedIndex(renderer.itemIndex);
+			}
+			break;
+		case "multiple-long-press":
+			var selectedIndices = this._listview.get_selectedIndices();
+			if(selectedIndices.length > 0) {
+				this.toggleSelection(renderer);
+			}
+			break;
+		case "one-item":
+			this._listview.set_selectedIndex(renderer.itemIndex);
+			break;
+		case "one-item-repeated":
+			this._listview.set_selectedIndices([renderer.itemIndex]);
+			break;
+		default:
+		}
+	}
+	,toggleSelection: function(renderer) {
+		var itemIndex = renderer.itemIndex;
+		var selectedIndices = this._listview.get_selectedIndices().slice();
+		var index = selectedIndices.indexOf(itemIndex);
+		if(index == -1) {
+			selectedIndices.push(itemIndex);
+		} else {
+			selectedIndices.splice(index,1);
+		}
+		this._listview.set_selectedIndices(selectedIndices);
+	}
+	,selectRange: function(fromIndex,toIndex) {
+		var tmp = this._listview;
+		var _g = [];
+		var _g1 = fromIndex;
+		var _g2 = toIndex + 1;
+		while(_g1 < _g2) {
+			var i = _g1++;
+			_g.push(i);
+		}
+		tmp.set_selectedIndices(_g);
+	}
+	,__class__: haxe_ui_containers_ListViewEvents
+});
+var haxe_ui_containers_ScrollViewBuilder = function(scrollview) {
+	haxe_ui_core_CompositeBuilder.call(this,scrollview);
+	this._scrollview = scrollview;
+};
+$hxClasses["haxe.ui.containers.ScrollViewBuilder"] = haxe_ui_containers_ScrollViewBuilder;
+haxe_ui_containers_ScrollViewBuilder.__name__ = "haxe.ui.containers.ScrollViewBuilder";
+haxe_ui_containers_ScrollViewBuilder.__super__ = haxe_ui_core_CompositeBuilder;
+haxe_ui_containers_ScrollViewBuilder.prototype = $extend(haxe_ui_core_CompositeBuilder.prototype,{
+	_scrollview: null
+	,_contents: null
+	,_contentsLayoutName: null
+	,create: function() {
+		var contentLayoutName = this._scrollview.get_contentLayoutName();
+		if(contentLayoutName == null) {
+			contentLayoutName = "vertical";
+		}
+		this.createContentContainer(contentLayoutName);
+	}
+	,destroy: function() {
+	}
+	,get_numComponents: function() {
+		return this._contents.get_numComponents();
+	}
+	,addComponent: function(child) {
+		if(((child) instanceof haxe_ui_components_HorizontalScroll) == false && ((child) instanceof haxe_ui_components_VerticalScroll) == false && child.classes.indexOf("scrollview-contents") != -1 == false) {
+			return this._contents.addComponent(child);
+		}
+		return null;
+	}
+	,addComponentAt: function(child,index) {
+		if(((child) instanceof haxe_ui_components_HorizontalScroll) == false && ((child) instanceof haxe_ui_components_VerticalScroll) == false && child.classes.indexOf("scrollview-contents") != -1 == false) {
+			return this._contents.addComponentAt(child,index);
+		}
+		return null;
+	}
+	,removeComponent: function(child,dispose,invalidate) {
+		if(invalidate == null) {
+			invalidate = true;
+		}
+		if(dispose == null) {
+			dispose = true;
+		}
+		if(((child) instanceof haxe_ui_components_HorizontalScroll) == false && ((child) instanceof haxe_ui_components_VerticalScroll) == false && child.classes.indexOf("scrollview-contents") != -1 == false) {
+			return this._contents.removeComponent(child,dispose,invalidate);
+		}
+		return null;
+	}
+	,removeComponentAt: function(index,dispose,invalidate) {
+		if(invalidate == null) {
+			invalidate = true;
+		}
+		if(dispose == null) {
+			dispose = true;
+		}
+		return this._contents.removeComponentAt(index,dispose,invalidate);
+	}
+	,getComponentIndex: function(child) {
+		return this._contents.getComponentIndex(child);
+	}
+	,setComponentIndex: function(child,index) {
+		if(((child) instanceof haxe_ui_components_HorizontalScroll) == false && ((child) instanceof haxe_ui_components_VerticalScroll) == false && child.classes.indexOf("scrollview-contents") != -1 == false) {
+			return this._contents.setComponentIndex(child,index);
+		}
+		return null;
+	}
+	,getComponentAt: function(index) {
+		return this._contents.getComponentAt(index);
+	}
+	,createContentContainer: function(layoutName) {
+		if(this._contents == null) {
+			this._contents = new haxe_ui_containers_Box();
+			this._contents.addClass("scrollview-contents");
+			this._contents.set_id("scrollview-contents");
+			this._contents.set_layout(haxe_ui_layouts_LayoutFactory.createFromName(layoutName));
+			this._component.addComponent(this._contents);
+			this._contentsLayoutName = layoutName;
+		}
+	}
+	,horizontalConstraintModifier: function() {
+		return 0;
+	}
+	,verticalConstraintModifier: function() {
+		return 0;
+	}
+	,checkScrolls: function() {
+		if(this._component.get_isNativeScroller() == true) {
+			return;
+		}
+		var usableSize = this._component.get_layout().get_usableSize();
+		if(this.get_virtualHorizontal() == false && usableSize.width > 0) {
+			var horizontalConstraint = this._contents;
+			var hscroll = this._component.findComponent(null,haxe_ui_components_HorizontalScroll,false);
+			var vcw = horizontalConstraint.get_width() + this.horizontalConstraintModifier();
+			if(vcw > usableSize.width) {
+				if(hscroll == null) {
+					hscroll = this.createHScroll();
+				}
+				hscroll.set_max(vcw - usableSize.width);
+				hscroll.set_pageSize(usableSize.width / vcw * hscroll.get_max());
+				hscroll.syncComponentValidation();
+			} else if(hscroll != null) {
+				this.destroyHScroll();
+			}
+		}
+		if(this.get_virtualVertical() == false && usableSize.height > 0) {
+			var verticalConstraint = this._contents;
+			var vscroll = this._component.findComponent(null,haxe_ui_components_VerticalScroll,false);
+			var vch = verticalConstraint.get_height() + this.verticalConstraintModifier();
+			if(vch > usableSize.height) {
+				if(vscroll == null) {
+					vscroll = this.createVScroll();
+				}
+				vscroll.set_max(vch - usableSize.height);
+				vscroll.set_pageSize(usableSize.height / vch * vscroll.get_max());
+				vscroll.syncComponentValidation();
+			} else if(vscroll != null) {
+				this.destroyVScroll();
+			}
+		}
+	}
+	,createHScroll: function() {
+		if(this._component.get_isNativeScroller() == true) {
+			return null;
+		}
+		var usableSize = this._component.get_layout().get_usableSize();
+		var horizontalConstraint = this._contents;
+		var hscroll = this._component.findComponent(null,haxe_ui_components_HorizontalScroll,false);
+		var vcw = horizontalConstraint.get_width() + this.horizontalConstraintModifier();
+		if(usableSize.width <= 0) {
+			return hscroll;
+		}
+		if(vcw > usableSize.width && hscroll == null) {
+			hscroll = new haxe_ui_components_HorizontalScroll();
+			hscroll.set_scriptAccess(false);
+			hscroll.set_includeInLayout(!this._scrollview.get_autoHideScrolls());
+			hscroll.set_hidden(this._scrollview.get_autoHideScrolls());
+			hscroll.set_percentWidth(100);
+			hscroll.set_allowFocus(false);
+			hscroll.set_id("scrollview-hscroll");
+			this._component.addComponent(hscroll);
+			this._component.registerInternalEvents(null,true);
+		}
+		return hscroll;
+	}
+	,createVScroll: function() {
+		if(this._component.get_isNativeScroller() == true) {
+			return null;
+		}
+		var usableSize = this._component.get_layout().get_usableSize();
+		var verticalConstraint = this._contents;
+		var vscroll = this._component.findComponent(null,haxe_ui_components_VerticalScroll,false);
+		var vch = verticalConstraint.get_height() + this.verticalConstraintModifier();
+		if(usableSize.height <= 0) {
+			return vscroll;
+		}
+		if(vch > usableSize.height && vscroll == null) {
+			vscroll = new haxe_ui_components_VerticalScroll();
+			vscroll.set_scriptAccess(false);
+			vscroll.set_includeInLayout(!this._scrollview.get_autoHideScrolls());
+			vscroll.set_hidden(this._scrollview.get_autoHideScrolls());
+			vscroll.set_percentHeight(100);
+			vscroll.set_allowFocus(false);
+			vscroll.set_id("scrollview-vscroll");
+			this._component.addComponent(vscroll);
+			this._component.registerInternalEvents(null,true);
+		}
+		return vscroll;
+	}
+	,destroyHScroll: function() {
+		var hscroll = this._component.findComponent(null,haxe_ui_components_HorizontalScroll,false);
+		if(hscroll != null) {
+			this._component.removeComponent(hscroll);
+		}
+	}
+	,destroyVScroll: function() {
+		var vscroll = this._component.findComponent(null,haxe_ui_components_VerticalScroll,false);
+		if(vscroll != null) {
+			this._component.removeComponent(vscroll);
+		}
+	}
+	,updateScrollRect: function() {
+		if(this._contents == null) {
+			return;
+		}
+		var usableSize = this._component.get_layout().get_usableSize();
+		var clipCX = usableSize.width - this.horizontalConstraintModifier();
+		if(clipCX > this._contents.get_width()) {
+			clipCX = this._contents.get_width() + this.horizontalConstraintModifier();
+		}
+		var clipCY = usableSize.height - this.verticalConstraintModifier();
+		if(clipCY > this._contents.get_height()) {
+			clipCY = this._contents.get_height() + this.verticalConstraintModifier();
+		}
+		var xpos = 0;
+		var ypos = 0;
+		if(this.get_virtualHorizontal() == false) {
+			var hscroll = this._component.findComponent(null,haxe_ui_components_HorizontalScroll,false);
+			if(hscroll != null) {
+				xpos = hscroll.get_pos();
+			}
+		} else if(this._contents.get_componentClipRect() != null) {
+			clipCX = this._contents.get_componentClipRect().width;
+		}
+		if(this.get_virtualVertical() == false) {
+			var vscroll = this._component.findComponent(null,haxe_ui_components_VerticalScroll,false);
+			if(vscroll != null) {
+				ypos = vscroll.get_pos();
+			}
+		} else if(this._contents.get_componentClipRect() != null) {
+			clipCY = this._contents.get_componentClipRect().height;
+		}
+		var rc = new haxe_ui_geom_Rectangle(xpos + 1,ypos,Math.round(clipCX),Math.round(clipCY));
+		this._contents.set_componentClipRect(rc);
+	}
+	,virtualHorizontal: null
+	,get_virtualHorizontal: function() {
+		return this._scrollview.get_virtual();
+	}
+	,virtualVertical: null
+	,get_virtualVertical: function() {
+		return this._scrollview.get_virtual();
+	}
+	,onVirtualChanged: function() {
+	}
+	,applyStyle: function(style) {
+		haxe_ui_core_CompositeBuilder.prototype.applyStyle.call(this,style);
+		if(style.mode != null && style.mode == "mobile") {
+			this._scrollview.set_autoHideScrolls(true);
+		} else {
+			this._scrollview.set_autoHideScrolls(false);
+		}
+		if(style.contentWidth != null && style.contentWidth != this._scrollview.get_contentWidth()) {
+			this._scrollview.set_contentWidth(style.contentWidth);
+		} else if(style.contentWidthPercent != null && style.contentWidthPercent != this._scrollview.get_percentContentWidth()) {
+			this._scrollview.set_percentContentWidth(style.contentWidthPercent);
+		}
+		if(style.contentHeight != null && style.contentHeight != this._scrollview.get_contentHeight()) {
+			this._scrollview.set_contentHeight(style.contentHeight);
+		} else if(style.contentHeightPercent != null && style.contentHeightPercent != this._scrollview.get_percentContentHeight()) {
+			this._scrollview.set_percentContentHeight(style.contentHeightPercent);
+		}
+	}
+	,__class__: haxe_ui_containers_ScrollViewBuilder
+	,__properties__: $extend(haxe_ui_core_CompositeBuilder.prototype.__properties__,{get_virtualVertical:"get_virtualVertical",get_virtualHorizontal:"get_virtualHorizontal"})
+});
+var haxe_ui_containers__$ListView_ListViewBuilder = function(listview) {
+	haxe_ui_containers_ScrollViewBuilder.call(this,listview);
+	this._listview = listview;
+};
+$hxClasses["haxe.ui.containers._ListView.ListViewBuilder"] = haxe_ui_containers__$ListView_ListViewBuilder;
+haxe_ui_containers__$ListView_ListViewBuilder.__name__ = "haxe.ui.containers._ListView.ListViewBuilder";
+haxe_ui_containers__$ListView_ListViewBuilder.__super__ = haxe_ui_containers_ScrollViewBuilder;
+haxe_ui_containers__$ListView_ListViewBuilder.prototype = $extend(haxe_ui_containers_ScrollViewBuilder.prototype,{
+	_listview: null
+	,create: function() {
+		this.createContentContainer(this._listview.get_virtual() ? "absolute" : "vertical");
+	}
+	,createContentContainer: function(layoutName) {
+		if(this._contents == null) {
+			haxe_ui_containers_ScrollViewBuilder.prototype.createContentContainer.call(this,layoutName);
+			this._contents.addClass("listview-contents");
+		}
+	}
+	,addComponent: function(child) {
+		var r = null;
+		if(((child) instanceof haxe_ui_core_ItemRenderer) && (this._listview.get_itemRenderer() == null && this._listview.get_itemRendererClass() == null)) {
+			this._listview.set_itemRenderer(js_Boot.__cast(child , haxe_ui_core_ItemRenderer));
+			this._listview.get_itemRenderer().ready();
+			this._listview.get_itemRenderer().handleVisibility(false);
+			r = child;
+		} else {
+			r = haxe_ui_containers_ScrollViewBuilder.prototype.addComponent.call(this,child);
+		}
+		return r;
+	}
+	,onVirtualChanged: function() {
+		this._contents.set_layoutName(this._listview.get_virtual() ? "absolute" : "vertical");
+	}
+	,addItemRendererClass: function(child,className,add) {
+		if(add == null) {
+			add = true;
+		}
+		var _gthis = this;
+		child.walkComponents(function(c) {
+			if(((c) instanceof haxe_ui_core_ItemRenderer)) {
+				if(add == true) {
+					c.addClass(className);
+					haxe_ui_Toolkit.callLater(function() {
+						_gthis.ensureVisible(js_Boot.__cast(c , haxe_ui_core_ItemRenderer));
+					});
+				} else {
+					c.removeClass(className);
+				}
+			} else {
+				c.invalidateComponent("style",false);
+			}
+			return true;
+		});
+	}
+	,ensureVisible: function(itemToEnsure) {
+		if(itemToEnsure != null && this._listview.get_virtual() == false) {
+			var vscroll = this._listview.findComponent(null,haxe_ui_components_VerticalScroll);
+			if(vscroll != null) {
+				var vpos = vscroll.get_pos();
+				var contents = this._listview.findComponent("listview-contents",null,null,"css");
+				if(itemToEnsure.get_top() + itemToEnsure.get_height() > vpos + contents.get_componentClipRect().height) {
+					vscroll.set_pos(itemToEnsure.get_top() + itemToEnsure.get_height() - contents.get_componentClipRect().height);
+				} else if(itemToEnsure.get_top() < vpos) {
+					vscroll.set_pos(itemToEnsure.get_top());
+				}
+			}
+		}
+	}
+	,ensureVirtualItemVisible: function(index) {
+		var vscroll = this._listview.findComponent(null,haxe_ui_components_VerticalScroll);
+		if(vscroll != null) {
+			var layout = js_Boot.__cast(this._listview.get_layout() , haxe_ui_layouts_VerticalVirtualLayout);
+			var itemHeight = layout.get_itemHeight();
+			var itemTop = index * itemHeight;
+			var vpos = vscroll.get_pos();
+			var contents = this._listview.findComponent("listview-contents",null,null,"css");
+			if(itemTop + itemHeight > vpos + contents.get_componentClipRect().height) {
+				vscroll.set_pos(itemTop + itemHeight - contents.get_componentClipRect().height);
+			} else if(itemTop < vpos) {
+				vscroll.set_pos(itemTop);
+			}
+		}
+	}
+	,__class__: haxe_ui_containers__$ListView_ListViewBuilder
+});
+var haxe_ui_containers__$ListView_DataSourceBehaviour = function(component) {
+	this._firstPass = true;
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._ListView.DataSourceBehaviour"] = haxe_ui_containers__$ListView_DataSourceBehaviour;
+haxe_ui_containers__$ListView_DataSourceBehaviour.__name__ = "haxe.ui.containers._ListView.DataSourceBehaviour";
+haxe_ui_containers__$ListView_DataSourceBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_containers__$ListView_DataSourceBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	_firstPass: null
+	,set: function(value) {
+		var _gthis = this;
+		haxe_ui_behaviours_DataBehaviour.prototype.set.call(this,value);
+		var dataSource = haxe_ui_util_Variant.toDataSource(this._value);
+		if(dataSource != null) {
+			dataSource.onChange = function() {
+				var _this = _gthis._component;
+				if(!(_this._layout == null || _this._layoutLocked == true)) {
+					_this.invalidateComponent("layout",false);
+				}
+				if(_gthis._firstPass == true) {
+					_gthis._component.syncComponentValidation();
+					_gthis._firstPass = false;
+					var _this = _gthis._component;
+					if(!(_this._layout == null || _this._layoutLocked == true)) {
+						_this.invalidateComponent("layout",false);
+					}
+				}
+			};
+			var _this = this._component;
+			if(!(_this._layout == null || _this._layoutLocked == true)) {
+				_this.invalidateComponent("layout",false);
+			}
+		} else {
+			var _this = this._component;
+			if(!(_this._layout == null || _this._layoutLocked == true)) {
+				_this.invalidateComponent("layout",false);
+			}
+		}
+	}
+	,get: function() {
+		if(this._value == null || haxe_ui_util_Variant.get_isNull(this._value)) {
+			this._value = haxe_ui_util_Variant.fromDataSource(new haxe_ui_data_ArrayDataSource());
+			this.set(this._value);
+		}
+		return this._value;
+	}
+	,__class__: haxe_ui_containers__$ListView_DataSourceBehaviour
+});
+var haxe_ui_containers__$ListView_SelectedIndexBehaviour = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._ListView.SelectedIndexBehaviour"] = haxe_ui_containers__$ListView_SelectedIndexBehaviour;
+haxe_ui_containers__$ListView_SelectedIndexBehaviour.__name__ = "haxe.ui.containers._ListView.SelectedIndexBehaviour";
+haxe_ui_containers__$ListView_SelectedIndexBehaviour.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_containers__$ListView_SelectedIndexBehaviour.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	get: function() {
+		var listView = js_Boot.__cast(this._component , haxe_ui_containers_ListView);
+		var selectedIndices = listView.get_selectedIndices();
+		if(selectedIndices != null && selectedIndices.length > 0) {
+			return haxe_ui_util_Variant.fromInt(selectedIndices[selectedIndices.length - 1]);
+		} else {
+			return haxe_ui_util_Variant.fromInt(-1);
+		}
+	}
+	,set: function(value) {
+		var listView = js_Boot.__cast(this._component , haxe_ui_containers_ListView);
+		listView.set_selectedIndices(haxe_ui_util_Variant.neq(value,haxe_ui_util_Variant.fromInt(-1)) ? [haxe_ui_util_Variant.toInt(value)] : null);
+	}
+	,__class__: haxe_ui_containers__$ListView_SelectedIndexBehaviour
+});
+var haxe_ui_containers__$ListView_SelectedItemBehaviour = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._ListView.SelectedItemBehaviour"] = haxe_ui_containers__$ListView_SelectedItemBehaviour;
+haxe_ui_containers__$ListView_SelectedItemBehaviour.__name__ = "haxe.ui.containers._ListView.SelectedItemBehaviour";
+haxe_ui_containers__$ListView_SelectedItemBehaviour.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_containers__$ListView_SelectedItemBehaviour.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	getDynamic: function() {
+		var listView = js_Boot.__cast(this._component , haxe_ui_containers_ListView);
+		var selectedIndices = listView.get_selectedIndices();
+		if(selectedIndices.length > 0) {
+			return listView.get_dataSource().get(selectedIndices[selectedIndices.length - 1]);
+		} else {
+			return null;
+		}
+	}
+	,set: function(value) {
+		var listView = js_Boot.__cast(this._component , haxe_ui_containers_ListView);
+		var index = listView.get_dataSource().indexOf(value);
+		if(index != -1 && listView.get_selectedIndices().indexOf(index) == -1) {
+			listView.set_selectedIndices([index]);
+		}
+	}
+	,__class__: haxe_ui_containers__$ListView_SelectedItemBehaviour
+});
+var haxe_ui_containers__$ListView_SelectedIndicesBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._ListView.SelectedIndicesBehaviour"] = haxe_ui_containers__$ListView_SelectedIndicesBehaviour;
+haxe_ui_containers__$ListView_SelectedIndicesBehaviour.__name__ = "haxe.ui.containers._ListView.SelectedIndicesBehaviour";
+haxe_ui_containers__$ListView_SelectedIndicesBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_containers__$ListView_SelectedIndicesBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	get: function() {
+		if(haxe_ui_util_Variant.get_isNull(this._value)) {
+			return haxe_ui_util_Variant.fromArray([]);
+		} else {
+			return this._value;
+		}
+	}
+	,validateData: function() {
+		var listView = js_Boot.__cast(this._component , haxe_ui_containers_ListView);
+		var selectedIndices = listView.get_selectedIndices();
+		var contents = this._component.findComponent("scrollview-contents",null,false,"css");
+		var builder = js_Boot.__cast(this._component._compositeBuilder , haxe_ui_containers__$ListView_ListViewBuilder);
+		var _g = 0;
+		var _g1 = contents._children == null ? [] : contents._children;
+		while(_g < _g1.length) {
+			var child = _g1[_g];
+			++_g;
+			if(selectedIndices.indexOf((js_Boot.__cast(child , haxe_ui_core_ItemRenderer)).itemIndex) != -1) {
+				builder.addItemRendererClass(child,":selected");
+			} else {
+				builder.addItemRendererClass(child,":selected",false);
+			}
+		}
+		if(listView.get_virtual() == true) {
+			var _g = 0;
+			while(_g < selectedIndices.length) {
+				var i = selectedIndices[_g];
+				++_g;
+				builder.ensureVirtualItemVisible(i);
+			}
+		}
+		if(listView.get_selectedIndex() != -1 && listView.get_selectedIndices().length != 0) {
+			this._component.dispatch(new haxe_ui_events_UIEvent("change"));
+		}
+	}
+	,__class__: haxe_ui_containers__$ListView_SelectedIndicesBehaviour
+});
+var haxe_ui_containers__$ListView_SelectedItemsBehaviour = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._ListView.SelectedItemsBehaviour"] = haxe_ui_containers__$ListView_SelectedItemsBehaviour;
+haxe_ui_containers__$ListView_SelectedItemsBehaviour.__name__ = "haxe.ui.containers._ListView.SelectedItemsBehaviour";
+haxe_ui_containers__$ListView_SelectedItemsBehaviour.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_containers__$ListView_SelectedItemsBehaviour.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	get: function() {
+		var listView = js_Boot.__cast(this._component , haxe_ui_containers_ListView);
+		var selectedIndices = listView.get_selectedIndices();
+		if(selectedIndices != null && selectedIndices.length > 0) {
+			var selectedItems = [];
+			var _g = 0;
+			while(_g < selectedIndices.length) {
+				var i = selectedIndices[_g];
+				++_g;
+				if(i < 0 || i >= listView.get_dataSource().get_size()) {
+					continue;
+				}
+				var data = listView.get_dataSource().get(i);
+				selectedItems.push(data);
+			}
+			return haxe_ui_util_Variant.fromArray(selectedItems);
+		} else {
+			return haxe_ui_util_Variant.fromArray([]);
+		}
+	}
+	,set: function(value) {
+		var listView = js_Boot.__cast(this._component , haxe_ui_containers_ListView);
+		var selectedItems = haxe_ui_util_Variant.toArray(value);
+		if(selectedItems != null && selectedItems.length > 0) {
+			var selectedIndices = [];
+			var index;
+			var _g = 0;
+			while(_g < selectedItems.length) {
+				var item = selectedItems[_g];
+				++_g;
+				index = listView.get_dataSource().indexOf(item);
+				if(index != -1) {
+					selectedIndices.push(index);
+				}
+			}
+			listView.set_selectedIndices(selectedIndices);
+		} else {
+			listView.set_selectedIndices([]);
+		}
+	}
+	,__class__: haxe_ui_containers__$ListView_SelectedItemsBehaviour
+});
+var haxe_ui_containers__$ListView_SelectionModeBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._ListView.SelectionModeBehaviour"] = haxe_ui_containers__$ListView_SelectionModeBehaviour;
+haxe_ui_containers__$ListView_SelectionModeBehaviour.__name__ = "haxe.ui.containers._ListView.SelectionModeBehaviour";
+haxe_ui_containers__$ListView_SelectionModeBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_containers__$ListView_SelectionModeBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		var listView = js_Boot.__cast(this._component , haxe_ui_containers_ListView);
+		var selectedIndices = listView.get_selectedIndices();
+		if(selectedIndices == null || selectedIndices.length == 0) {
+			return;
+		}
+		var selectionMode = haxe_ui_util_Variant.toString(this._value);
+		switch(selectionMode) {
+		case "disabled":
+			listView.set_selectedIndices(null);
+			break;
+		case "one-item":
+			if(selectedIndices.length > 1) {
+				listView.set_selectedIndices([selectedIndices[0]]);
+			}
+			break;
+		default:
+		}
+	}
+	,__class__: haxe_ui_containers__$ListView_SelectionModeBehaviour
+});
+var haxe_ui_containers__$ScrollView_Virtual = function(component) {
+	haxe_ui_behaviours_DefaultBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._ScrollView.Virtual"] = haxe_ui_containers__$ScrollView_Virtual;
+haxe_ui_containers__$ScrollView_Virtual.__name__ = "haxe.ui.containers._ScrollView.Virtual";
+haxe_ui_containers__$ScrollView_Virtual.__super__ = haxe_ui_behaviours_DefaultBehaviour;
+haxe_ui_containers__$ScrollView_Virtual.prototype = $extend(haxe_ui_behaviours_DefaultBehaviour.prototype,{
+	set: function(value) {
+		haxe_ui_behaviours_DefaultBehaviour.prototype.set.call(this,value);
+		if(this._component._compositeBuilder != null) {
+			(js_Boot.__cast(this._component._compositeBuilder , haxe_ui_containers_ScrollViewBuilder)).onVirtualChanged();
+		}
+	}
+	,__class__: haxe_ui_containers__$ScrollView_Virtual
+});
+var haxe_ui_containers__$ScrollView_ContentLayoutName = function(component) {
+	haxe_ui_behaviours_DefaultBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._ScrollView.ContentLayoutName"] = haxe_ui_containers__$ScrollView_ContentLayoutName;
+haxe_ui_containers__$ScrollView_ContentLayoutName.__name__ = "haxe.ui.containers._ScrollView.ContentLayoutName";
+haxe_ui_containers__$ScrollView_ContentLayoutName.__super__ = haxe_ui_behaviours_DefaultBehaviour;
+haxe_ui_containers__$ScrollView_ContentLayoutName.prototype = $extend(haxe_ui_behaviours_DefaultBehaviour.prototype,{
+	set: function(value) {
+		haxe_ui_behaviours_DefaultBehaviour.prototype.set.call(this,value);
+		var builder = js_Boot.__cast(this._component._compositeBuilder , haxe_ui_containers_ScrollViewBuilder);
+		if(builder != null && haxe_ui_util_Variant.fromString(builder._contentsLayoutName) != value) {
+			builder._contentsLayoutName = haxe_ui_util_Variant.toString(value);
+			builder._contents.set_layout(haxe_ui_layouts_LayoutFactory.createFromName(haxe_ui_util_Variant.toString(value)));
+		}
+	}
+	,__class__: haxe_ui_containers__$ScrollView_ContentLayoutName
+});
+var haxe_ui_containers__$ScrollView_ContentWidth = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._ScrollView.ContentWidth"] = haxe_ui_containers__$ScrollView_ContentWidth;
+haxe_ui_containers__$ScrollView_ContentWidth.__name__ = "haxe.ui.containers._ScrollView.ContentWidth";
+haxe_ui_containers__$ScrollView_ContentWidth.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_containers__$ScrollView_ContentWidth.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	get: function() {
+		var contents = this._component.findComponent("scrollview-contents",null,false,"css");
+		if(contents == null) {
+			return null;
+		}
+		return haxe_ui_util_Variant.fromFloat(contents.get_width());
+	}
+	,set: function(value) {
+		var contents = this._component.findComponent("scrollview-contents",null,false,"css");
+		if(contents != null) {
+			contents.set_percentWidth(null);
+			contents.set_width(haxe_ui_util_Variant.toFloat(value));
+		}
+	}
+	,__class__: haxe_ui_containers__$ScrollView_ContentWidth
+});
+var haxe_ui_containers__$ScrollView_PercentContentWidth = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._ScrollView.PercentContentWidth"] = haxe_ui_containers__$ScrollView_PercentContentWidth;
+haxe_ui_containers__$ScrollView_PercentContentWidth.__name__ = "haxe.ui.containers._ScrollView.PercentContentWidth";
+haxe_ui_containers__$ScrollView_PercentContentWidth.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_containers__$ScrollView_PercentContentWidth.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	get: function() {
+		var contents = this._component.findComponent("scrollview-contents",null,false,"css");
+		if(contents == null) {
+			return null;
+		}
+		return haxe_ui_util_Variant.fromFloat(contents.get_percentWidth());
+	}
+	,set: function(value) {
+		var contents = this._component.findComponent("scrollview-contents",null,false,"css");
+		if(contents != null) {
+			contents.set_componentWidth(null);
+			contents.set_percentWidth(haxe_ui_util_Variant.toFloat(value));
+		}
+	}
+	,__class__: haxe_ui_containers__$ScrollView_PercentContentWidth
+});
+var haxe_ui_containers__$ScrollView_ContentHeight = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._ScrollView.ContentHeight"] = haxe_ui_containers__$ScrollView_ContentHeight;
+haxe_ui_containers__$ScrollView_ContentHeight.__name__ = "haxe.ui.containers._ScrollView.ContentHeight";
+haxe_ui_containers__$ScrollView_ContentHeight.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_containers__$ScrollView_ContentHeight.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	get: function() {
+		var contents = this._component.findComponent("scrollview-contents",null,false,"css");
+		if(contents == null) {
+			return null;
+		}
+		return haxe_ui_util_Variant.fromFloat(contents.get_height());
+	}
+	,set: function(value) {
+		var contents = this._component.findComponent("scrollview-contents",null,false,"css");
+		if(contents != null) {
+			contents.set_percentHeight(null);
+			contents.set_height(haxe_ui_util_Variant.toFloat(value));
+		}
+	}
+	,__class__: haxe_ui_containers__$ScrollView_ContentHeight
+});
+var haxe_ui_containers__$ScrollView_PercentContentHeight = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._ScrollView.PercentContentHeight"] = haxe_ui_containers__$ScrollView_PercentContentHeight;
+haxe_ui_containers__$ScrollView_PercentContentHeight.__name__ = "haxe.ui.containers._ScrollView.PercentContentHeight";
+haxe_ui_containers__$ScrollView_PercentContentHeight.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_containers__$ScrollView_PercentContentHeight.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	get: function() {
+		var contents = this._component.findComponent("scrollview-contents",null,false,"css");
+		if(contents == null) {
+			return null;
+		}
+		return haxe_ui_util_Variant.fromFloat(contents.get_percentHeight());
+	}
+	,set: function(value) {
+		var contents = this._component.findComponent("scrollview-contents",null,false,"css");
+		if(contents != null) {
+			contents.set_componentHeight(null);
+			contents.set_percentHeight(haxe_ui_util_Variant.toFloat(value));
+		}
+	}
+	,__class__: haxe_ui_containers__$ScrollView_PercentContentHeight
+});
+var haxe_ui_containers__$ScrollView_HScrollPos = function(scrollview) {
+	haxe_ui_behaviours_DataBehaviour.call(this,scrollview);
+	this._scrollview = scrollview;
+};
+$hxClasses["haxe.ui.containers._ScrollView.HScrollPos"] = haxe_ui_containers__$ScrollView_HScrollPos;
+haxe_ui_containers__$ScrollView_HScrollPos.__name__ = "haxe.ui.containers._ScrollView.HScrollPos";
+haxe_ui_containers__$ScrollView_HScrollPos.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_containers__$ScrollView_HScrollPos.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	_scrollview: null
+	,get: function() {
+		var hscroll = this._scrollview.findComponent(null,haxe_ui_components_HorizontalScroll,false);
+		if(hscroll == null) {
+			return haxe_ui_util_Variant.fromInt(0);
+		}
+		return haxe_ui_util_Variant.fromFloat(hscroll.get_pos());
+	}
+	,validateData: function() {
+		var hscroll = this._scrollview.findComponent(null,haxe_ui_components_HorizontalScroll,false);
+		if(this._scrollview.get_virtual() == true) {
+			if(hscroll == null) {
+				hscroll = (js_Boot.__cast(this._scrollview._compositeBuilder , haxe_ui_containers_ScrollViewBuilder)).createHScroll();
+			}
+			if(hscroll != null) {
+				hscroll.set_pos(haxe_ui_util_Variant.toFloat(this._value));
+			}
+		} else if(hscroll != null) {
+			hscroll.set_pos(haxe_ui_util_Variant.toFloat(this._value));
+		}
+	}
+	,__class__: haxe_ui_containers__$ScrollView_HScrollPos
+});
+var haxe_ui_containers__$ScrollView_VScrollPos = function(scrollview) {
+	haxe_ui_behaviours_DataBehaviour.call(this,scrollview);
+	this._scrollview = scrollview;
+};
+$hxClasses["haxe.ui.containers._ScrollView.VScrollPos"] = haxe_ui_containers__$ScrollView_VScrollPos;
+haxe_ui_containers__$ScrollView_VScrollPos.__name__ = "haxe.ui.containers._ScrollView.VScrollPos";
+haxe_ui_containers__$ScrollView_VScrollPos.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_containers__$ScrollView_VScrollPos.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	_scrollview: null
+	,get: function() {
+		var vscroll = this._scrollview.findComponent(null,haxe_ui_components_VerticalScroll,false);
+		if(vscroll == null) {
+			return haxe_ui_util_Variant.fromInt(0);
+		}
+		return haxe_ui_util_Variant.fromFloat(vscroll.get_pos());
+	}
+	,validateData: function() {
+		var vscroll = this._scrollview.findComponent(null,haxe_ui_components_VerticalScroll,false);
+		if(this._scrollview.get_virtual() == true) {
+			if(vscroll == null) {
+				vscroll = (js_Boot.__cast(this._scrollview._compositeBuilder , haxe_ui_containers_ScrollViewBuilder)).createVScroll();
+			}
+			if(vscroll != null) {
+				vscroll.set_pos(haxe_ui_util_Variant.toFloat(this._value));
+			}
+		} else if(vscroll != null) {
+			vscroll.set_pos(haxe_ui_util_Variant.toFloat(this._value));
+		}
+	}
+	,__class__: haxe_ui_containers__$ScrollView_VScrollPos
+});
+var haxe_ui_containers__$ScrollView_HScrollMax = function(scrollview) {
+	haxe_ui_behaviours_DataBehaviour.call(this,scrollview);
+	this._scrollview = scrollview;
+};
+$hxClasses["haxe.ui.containers._ScrollView.HScrollMax"] = haxe_ui_containers__$ScrollView_HScrollMax;
+haxe_ui_containers__$ScrollView_HScrollMax.__name__ = "haxe.ui.containers._ScrollView.HScrollMax";
+haxe_ui_containers__$ScrollView_HScrollMax.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_containers__$ScrollView_HScrollMax.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	_scrollview: null
+	,get: function() {
+		var hscroll = this._scrollview.findComponent(null,haxe_ui_components_HorizontalScroll,false);
+		if(hscroll == null) {
+			return haxe_ui_util_Variant.fromInt(0);
+		}
+		return haxe_ui_util_Variant.fromFloat(hscroll.get_max());
+	}
+	,validateData: function() {
+		if(this._scrollview.get_virtual() == true) {
+			var hscroll = this._scrollview.findComponent(null,haxe_ui_components_HorizontalScroll,false);
+			if(haxe_ui_util_Variant.gt(this._value,haxe_ui_util_Variant.fromInt(0))) {
+				if(hscroll == null) {
+					hscroll = (js_Boot.__cast(this._scrollview._compositeBuilder , haxe_ui_containers_ScrollViewBuilder)).createHScroll();
+				}
+			} else if(hscroll != null) {
+				(js_Boot.__cast(this._scrollview._compositeBuilder , haxe_ui_containers_ScrollViewBuilder)).destroyHScroll();
+			}
+			if(hscroll != null) {
+				hscroll.set_max(haxe_ui_util_Variant.toFloat(this._value));
+			}
+		}
+	}
+	,__class__: haxe_ui_containers__$ScrollView_HScrollMax
+});
+var haxe_ui_containers__$ScrollView_VScrollMax = function(scrollview) {
+	haxe_ui_behaviours_DataBehaviour.call(this,scrollview);
+	this._scrollview = scrollview;
+};
+$hxClasses["haxe.ui.containers._ScrollView.VScrollMax"] = haxe_ui_containers__$ScrollView_VScrollMax;
+haxe_ui_containers__$ScrollView_VScrollMax.__name__ = "haxe.ui.containers._ScrollView.VScrollMax";
+haxe_ui_containers__$ScrollView_VScrollMax.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_containers__$ScrollView_VScrollMax.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	_scrollview: null
+	,get: function() {
+		var vscroll = this._scrollview.findComponent(null,haxe_ui_components_VerticalScroll,false);
+		if(vscroll == null) {
+			return haxe_ui_util_Variant.fromInt(0);
+		}
+		return haxe_ui_util_Variant.fromFloat(vscroll.get_max());
+	}
+	,validateData: function() {
+		if(this._scrollview.get_virtual() == true) {
+			var vscroll = this._scrollview.findComponent(null,haxe_ui_components_VerticalScroll,false);
+			if(haxe_ui_util_Variant.gt(this._value,haxe_ui_util_Variant.fromInt(0))) {
+				if(vscroll == null) {
+					vscroll = (js_Boot.__cast(this._scrollview._compositeBuilder , haxe_ui_containers_ScrollViewBuilder)).createVScroll();
+				}
+			} else if(vscroll != null) {
+				(js_Boot.__cast(this._scrollview._compositeBuilder , haxe_ui_containers_ScrollViewBuilder)).destroyVScroll();
+			}
+			if(vscroll != null) {
+				vscroll.set_max(haxe_ui_util_Variant.toFloat(this._value));
+			}
+		}
+	}
+	,__class__: haxe_ui_containers__$ScrollView_VScrollMax
+});
+var haxe_ui_containers__$ScrollView_HScrollPageSize = function(scrollview) {
+	haxe_ui_behaviours_DataBehaviour.call(this,scrollview);
+	this._scrollview = scrollview;
+};
+$hxClasses["haxe.ui.containers._ScrollView.HScrollPageSize"] = haxe_ui_containers__$ScrollView_HScrollPageSize;
+haxe_ui_containers__$ScrollView_HScrollPageSize.__name__ = "haxe.ui.containers._ScrollView.HScrollPageSize";
+haxe_ui_containers__$ScrollView_HScrollPageSize.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_containers__$ScrollView_HScrollPageSize.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	_scrollview: null
+	,validateData: function() {
+		if(this._scrollview.get_virtual() == true) {
+			var hscroll = this._scrollview.findComponent(null,haxe_ui_components_HorizontalScroll,false);
+			if(hscroll == null) {
+				hscroll = (js_Boot.__cast(this._scrollview._compositeBuilder , haxe_ui_containers_ScrollViewBuilder)).createHScroll();
+			}
+			if(hscroll != null) {
+				hscroll.set_pageSize(haxe_ui_util_Variant.toFloat(this._value));
+			}
+		}
+	}
+	,__class__: haxe_ui_containers__$ScrollView_HScrollPageSize
+});
+var haxe_ui_containers__$ScrollView_VScrollPageSize = function(scrollview) {
+	haxe_ui_behaviours_DataBehaviour.call(this,scrollview);
+	this._scrollview = scrollview;
+};
+$hxClasses["haxe.ui.containers._ScrollView.VScrollPageSize"] = haxe_ui_containers__$ScrollView_VScrollPageSize;
+haxe_ui_containers__$ScrollView_VScrollPageSize.__name__ = "haxe.ui.containers._ScrollView.VScrollPageSize";
+haxe_ui_containers__$ScrollView_VScrollPageSize.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_containers__$ScrollView_VScrollPageSize.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	_scrollview: null
+	,validateData: function() {
+		if(this._scrollview.get_virtual() == true) {
+			var vscroll = this._scrollview.findComponent(null,haxe_ui_components_VerticalScroll,false);
+			if(vscroll == null) {
+				vscroll = (js_Boot.__cast(this._scrollview._compositeBuilder , haxe_ui_containers_ScrollViewBuilder)).createVScroll();
+			}
+			if(vscroll != null) {
+				vscroll.set_pageSize(haxe_ui_util_Variant.toFloat(this._value));
+			}
+		}
+	}
+	,__class__: haxe_ui_containers__$ScrollView_VScrollPageSize
+});
+var haxe_ui_containers__$ScrollView_ScrollModeBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._ScrollView.ScrollModeBehaviour"] = haxe_ui_containers__$ScrollView_ScrollModeBehaviour;
+haxe_ui_containers__$ScrollView_ScrollModeBehaviour.__name__ = "haxe.ui.containers._ScrollView.ScrollModeBehaviour";
+haxe_ui_containers__$ScrollView_ScrollModeBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_containers__$ScrollView_ScrollModeBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		this._component.registerInternalEvents(null,true);
+	}
+	,__class__: haxe_ui_containers__$ScrollView_ScrollModeBehaviour
+});
+var haxe_ui_containers__$ScrollView_GetContents = function(component) {
+	haxe_ui_behaviours_DefaultBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._ScrollView.GetContents"] = haxe_ui_containers__$ScrollView_GetContents;
+haxe_ui_containers__$ScrollView_GetContents.__name__ = "haxe.ui.containers._ScrollView.GetContents";
+haxe_ui_containers__$ScrollView_GetContents.__super__ = haxe_ui_behaviours_DefaultBehaviour;
+haxe_ui_containers__$ScrollView_GetContents.prototype = $extend(haxe_ui_behaviours_DefaultBehaviour.prototype,{
+	get: function() {
+		var contents = this._component.findComponent("scrollview-contents",null,false,"css");
+		return haxe_ui_util_Variant.fromComponent(contents);
+	}
+	,__class__: haxe_ui_containers__$ScrollView_GetContents
+});
+var haxe_ui_containers_TabView = function() {
+	haxe_ui_core_Component.call(this);
+};
+$hxClasses["haxe.ui.containers.TabView"] = haxe_ui_containers_TabView;
+haxe_ui_containers_TabView.__name__ = "haxe.ui.containers.TabView";
+haxe_ui_containers_TabView.__super__ = haxe_ui_core_Component;
+haxe_ui_containers_TabView.prototype = $extend(haxe_ui_core_Component.prototype,{
+	removePage: function(index) {
+		return this.behaviours.call("removePage",index);
+	}
+	,getPage: function(index) {
+		return haxe_ui_util_Variant.toComponent(this.behaviours.call("getPage",index));
+	}
+	,removeAllPages: function() {
+		return this.behaviours.call("removeAllPages",null);
+	}
+	,registerComposite: function() {
+		haxe_ui_core_Component.prototype.registerComposite.call(this);
+		this._compositeBuilderClass = haxe_ui_containers__$TabView_Builder;
+		this._internalEventsClass = haxe_ui_containers__$TabView_Events;
+		this._defaultLayoutClass = haxe_ui_containers__$TabView_Layout;
+	}
+	,registerBehaviours: function() {
+		haxe_ui_core_Component.prototype.registerBehaviours.call(this);
+		this.behaviours.register("pageIndex",haxe_ui_containers__$TabView_PageIndex,haxe_ui_util_Variant.fromInt(-1));
+		this.behaviours.register("selectedPage",haxe_ui_containers__$TabView_SelectedPage,null);
+		this.behaviours.register("tabPosition",haxe_ui_containers__$TabView_TabPosition);
+		this.behaviours.register("pageCount",haxe_ui_containers__$TabView_PageCount);
+		this.behaviours.register("closable",haxe_ui_containers__$TabView_Closable,haxe_ui_util_Variant.fromBool(false));
+		this.behaviours.register("removePage",haxe_ui_containers__$TabView_RemovePage);
+		this.behaviours.register("getPage",haxe_ui_containers__$TabView_GetPage);
+		this.behaviours.register("removeAllPages",haxe_ui_containers__$TabView_RemoveAllPages);
+	}
+	,get_pageIndex: function() {
+		return haxe_ui_util_Variant.toInt(this.behaviours.get("pageIndex"));
+	}
+	,set_pageIndex: function(value) {
+		this.behaviours.set("pageIndex",haxe_ui_util_Variant.fromInt(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"pageIndex"));
+		return value;
+	}
+	,get_selectedPage: function() {
+		return haxe_ui_util_Variant.toComponent(this.behaviours.get("selectedPage"));
+	}
+	,set_selectedPage: function(value) {
+		this.behaviours.set("selectedPage",haxe_ui_util_Variant.fromComponent(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"selectedPage"));
+		return value;
+	}
+	,get_tabPosition: function() {
+		return haxe_ui_util_Variant.toString(this.behaviours.get("tabPosition"));
+	}
+	,set_tabPosition: function(value) {
+		var _g = Type.typeof(value);
+		if(_g._hx_index == 6) {
+			if(_g.c == String) {
+				if(value != null && value.indexOf("{{") != -1 && value.indexOf("}}") != -1) {
+					haxe_ui_locale_LocaleManager.get_instance().registerComponent(this,"tabPosition",null,value);
+					return value;
+				}
+			}
+		}
+		this.behaviours.set("tabPosition",haxe_ui_util_Variant.fromString(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"tabPosition"));
+		return value;
+	}
+	,get_pageCount: function() {
+		return haxe_ui_util_Variant.toInt(this.behaviours.get("pageCount"));
+	}
+	,set_pageCount: function(value) {
+		this.behaviours.set("pageCount",haxe_ui_util_Variant.fromInt(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"pageCount"));
+		return value;
+	}
+	,get_closable: function() {
+		return haxe_ui_util_Variant.toBool(this.behaviours.get("closable"));
+	}
+	,set_closable: function(value) {
+		this.behaviours.set("closable",haxe_ui_util_Variant.fromBool(value));
+		this.dispatch(new haxe_ui_events_UIEvent("propertyChange",null,"closable"));
+		return value;
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_core_Component.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_containers_TabView();
+	}
+	,__class__: haxe_ui_containers_TabView
+	,__properties__: $extend(haxe_ui_core_Component.prototype.__properties__,{set_closable:"set_closable",get_closable:"get_closable",set_pageCount:"set_pageCount",get_pageCount:"get_pageCount",set_tabPosition:"set_tabPosition",get_tabPosition:"get_tabPosition",set_selectedPage:"set_selectedPage",get_selectedPage:"get_selectedPage",set_pageIndex:"set_pageIndex",get_pageIndex:"get_pageIndex"})
+});
+var haxe_ui_containers__$TabView_Layout = function() {
+	haxe_ui_layouts_DefaultLayout.call(this);
+};
+$hxClasses["haxe.ui.containers._TabView.Layout"] = haxe_ui_containers__$TabView_Layout;
+haxe_ui_containers__$TabView_Layout.__name__ = "haxe.ui.containers._TabView.Layout";
+haxe_ui_containers__$TabView_Layout.__super__ = haxe_ui_layouts_DefaultLayout;
+haxe_ui_containers__$TabView_Layout.prototype = $extend(haxe_ui_layouts_DefaultLayout.prototype,{
+	repositionChildren: function() {
+		var tabs = this.get_component().findComponent(null,haxe_ui_components_TabBar,false);
+		var content = this.get_component().findComponent(null,haxe_ui_containers_Box,false);
+		if(tabs == null || content == null) {
+			return;
+		}
+		if(this.get_component().classes.indexOf(":bottom") != -1) {
+			content.set_left(this.get_paddingLeft());
+			content.set_top(this.get_paddingTop());
+			tabs.set_left(this.get_paddingLeft());
+			if(tabs.get_height() != 0) {
+				tabs.set_top(this.get_component().get_height() - tabs.get_height() - this.get_paddingBottom() + this.marginTop(tabs));
+			}
+		} else {
+			tabs.set_left(this.get_paddingLeft());
+			tabs.set_top(this.get_paddingTop() + this.marginTop(tabs));
+			content.set_left(this.get_paddingLeft());
+			if(tabs.get_height() != 0) {
+				content.set_top(tabs.get_top() + tabs.get_height() - this.marginTop(tabs) + this.marginTop(content));
+			}
+		}
+	}
+	,resizeChildren: function() {
+		var tabs = this.get_component().findComponent(null,haxe_ui_components_TabBar,false);
+		var content = this.get_component().findComponent(null,haxe_ui_containers_Box,false);
+		if(tabs == null || content == null) {
+			return;
+		}
+		var usableSize = this.get_usableSize();
+		tabs.set_width(usableSize.width);
+		if(this.get_component().get_autoHeight() == false) {
+			content.set_height(usableSize.height + 1);
+		}
+		if(this.get_component().get_autoWidth() == false) {
+			content.set_width(this.get_component().get_width());
+		}
+	}
+	,get_usableSize: function() {
+		var size = haxe_ui_layouts_DefaultLayout.prototype.get_usableSize.call(this);
+		var tabs = this.get_component().findComponent(null,haxe_ui_components_TabBar,false);
+		if(tabs != null && tabs.get_componentHeight() != null) {
+			size.height -= tabs.get_componentHeight();
+		}
+		return size;
+	}
+	,__class__: haxe_ui_containers__$TabView_Layout
+});
+var haxe_ui_containers__$TabView_Closable = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._TabView.Closable"] = haxe_ui_containers__$TabView_Closable;
+haxe_ui_containers__$TabView_Closable.__name__ = "haxe.ui.containers._TabView.Closable";
+haxe_ui_containers__$TabView_Closable.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_containers__$TabView_Closable.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		if(this._component.get_native() == true) {
+			return;
+		}
+		var builder = js_Boot.__cast(this._component._compositeBuilder , haxe_ui_containers__$TabView_Builder);
+		builder._tabs.set_closable(haxe_ui_util_Variant.toBool(this._value));
+	}
+	,__class__: haxe_ui_containers__$TabView_Closable
+});
+var haxe_ui_containers__$TabView_PageIndex = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._TabView.PageIndex"] = haxe_ui_containers__$TabView_PageIndex;
+haxe_ui_containers__$TabView_PageIndex.__name__ = "haxe.ui.containers._TabView.PageIndex";
+haxe_ui_containers__$TabView_PageIndex.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_containers__$TabView_PageIndex.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	set: function(value) {
+		if(haxe_ui_util_Variant.gt(value,haxe_ui_util_Variant.fromInt(-1))) {
+			var builder = js_Boot.__cast(this._component._compositeBuilder , haxe_ui_containers__$TabView_Builder);
+			builder._tabs.set_selectedIndex(haxe_ui_util_Variant.toInt(value));
+		}
+		haxe_ui_behaviours_DataBehaviour.prototype.set.call(this,value);
+	}
+	,validateData: function() {
+		if(this._component.get_native() == true) {
+			return;
+		}
+		var builder = js_Boot.__cast(this._component._compositeBuilder , haxe_ui_containers__$TabView_Builder);
+		if(haxe_ui_util_Variant.lt(this._value,haxe_ui_util_Variant.fromInt(0))) {
+			return;
+		}
+		if(haxe_ui_util_Variant.gt(this._value,haxe_ui_util_Variant.fromInt(builder._views.length - 1))) {
+			this._value = haxe_ui_util_Variant.fromInt(builder._views.length - 1);
+			return;
+		}
+		builder._tabs.set_selectedIndex(haxe_ui_util_Variant.toInt(this._value));
+		var view = builder._views[haxe_ui_util_Variant.toInt(this._value)];
+		if(view != null) {
+			if(builder._currentView != null) {
+				builder._currentView.hide();
+			}
+			if(builder._content.getComponentIndex(view) == -1) {
+				builder._content.addComponent(view);
+			} else {
+				view.show();
+			}
+			builder._currentView = view;
+		}
+		this._component.dispatch(new haxe_ui_events_UIEvent("change"));
+	}
+	,__class__: haxe_ui_containers__$TabView_PageIndex
+});
+var haxe_ui_containers__$TabView_SelectedPage = function(component) {
+	haxe_ui_behaviours_DefaultBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._TabView.SelectedPage"] = haxe_ui_containers__$TabView_SelectedPage;
+haxe_ui_containers__$TabView_SelectedPage.__name__ = "haxe.ui.containers._TabView.SelectedPage";
+haxe_ui_containers__$TabView_SelectedPage.__super__ = haxe_ui_behaviours_DefaultBehaviour;
+haxe_ui_containers__$TabView_SelectedPage.prototype = $extend(haxe_ui_behaviours_DefaultBehaviour.prototype,{
+	get: function() {
+		var tabview = js_Boot.__cast(this._component , haxe_ui_containers_TabView);
+		var builder = js_Boot.__cast(this._component._compositeBuilder , haxe_ui_containers__$TabView_Builder);
+		var view = builder._views[tabview.get_pageIndex()];
+		return haxe_ui_util_Variant.fromComponent(view);
+	}
+	,set: function(value) {
+		var tabview = js_Boot.__cast(this._component , haxe_ui_containers_TabView);
+		var builder = js_Boot.__cast(this._component._compositeBuilder , haxe_ui_containers__$TabView_Builder);
+		var view = haxe_ui_util_Variant.toComponent(value);
+		var viewIndex = builder._views.indexOf(view);
+		if(viewIndex != -1) {
+			tabview.set_pageIndex(viewIndex);
+		}
+	}
+	,__class__: haxe_ui_containers__$TabView_SelectedPage
+});
+var haxe_ui_containers__$TabView_TabPosition = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._TabView.TabPosition"] = haxe_ui_containers__$TabView_TabPosition;
+haxe_ui_containers__$TabView_TabPosition.__name__ = "haxe.ui.containers._TabView.TabPosition";
+haxe_ui_containers__$TabView_TabPosition.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_containers__$TabView_TabPosition.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		if(haxe_ui_util_Variant.eq(this._value,haxe_ui_util_Variant.fromString("bottom"))) {
+			this._component.addClass(":bottom");
+		} else {
+			this._component.removeClass(":bottom");
+		}
+		this._component.findComponent(null,haxe_ui_components_TabBar,false).set_tabPosition(haxe_ui_util_Variant.toString(this._value));
+	}
+	,__class__: haxe_ui_containers__$TabView_TabPosition
+});
+var haxe_ui_containers__$TabView_PageCount = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._TabView.PageCount"] = haxe_ui_containers__$TabView_PageCount;
+haxe_ui_containers__$TabView_PageCount.__name__ = "haxe.ui.containers._TabView.PageCount";
+haxe_ui_containers__$TabView_PageCount.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_containers__$TabView_PageCount.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	get: function() {
+		var builder = js_Boot.__cast(this._component._compositeBuilder , haxe_ui_containers__$TabView_Builder);
+		return haxe_ui_util_Variant.fromInt(builder._tabs.get_tabCount());
+	}
+	,__class__: haxe_ui_containers__$TabView_PageCount
+});
+var haxe_ui_containers__$TabView_RemovePage = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._TabView.RemovePage"] = haxe_ui_containers__$TabView_RemovePage;
+haxe_ui_containers__$TabView_RemovePage.__name__ = "haxe.ui.containers._TabView.RemovePage";
+haxe_ui_containers__$TabView_RemovePage.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_containers__$TabView_RemovePage.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	call: function(param) {
+		var builder = js_Boot.__cast(this._component._compositeBuilder , haxe_ui_containers__$TabView_Builder);
+		var index = param;
+		if(index < builder._views.length) {
+			builder._tabs.removeTab(index);
+		}
+		return null;
+	}
+	,__class__: haxe_ui_containers__$TabView_RemovePage
+});
+var haxe_ui_containers__$TabView_GetPage = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._TabView.GetPage"] = haxe_ui_containers__$TabView_GetPage;
+haxe_ui_containers__$TabView_GetPage.__name__ = "haxe.ui.containers._TabView.GetPage";
+haxe_ui_containers__$TabView_GetPage.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_containers__$TabView_GetPage.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	call: function(param) {
+		var builder = js_Boot.__cast(this._component._compositeBuilder , haxe_ui_containers__$TabView_Builder);
+		var index = param;
+		var page = null;
+		if(index < builder._views.length) {
+			page = builder._views[index];
+		}
+		return haxe_ui_util_Variant.fromComponent(page);
+	}
+	,__class__: haxe_ui_containers__$TabView_GetPage
+});
+var haxe_ui_containers__$TabView_RemoveAllPages = function(component) {
+	haxe_ui_behaviours_Behaviour.call(this,component);
+};
+$hxClasses["haxe.ui.containers._TabView.RemoveAllPages"] = haxe_ui_containers__$TabView_RemoveAllPages;
+haxe_ui_containers__$TabView_RemoveAllPages.__name__ = "haxe.ui.containers._TabView.RemoveAllPages";
+haxe_ui_containers__$TabView_RemoveAllPages.__super__ = haxe_ui_behaviours_Behaviour;
+haxe_ui_containers__$TabView_RemoveAllPages.prototype = $extend(haxe_ui_behaviours_Behaviour.prototype,{
+	call: function(param) {
+		var builder = js_Boot.__cast(this._component._compositeBuilder , haxe_ui_containers__$TabView_Builder);
+		while(builder._views.length > 0) builder._tabs.removeTab(0);
+		(js_Boot.__cast(this._component , haxe_ui_containers_TabView)).set_pageIndex(-1);
+		builder._tabs.set_selectedIndex(-1);
+		return null;
+	}
+	,__class__: haxe_ui_containers__$TabView_RemoveAllPages
+});
+var haxe_ui_containers__$TabView_Events = function(tabview) {
+	haxe_ui_events_Events.call(this,tabview);
+	this._tabview = tabview;
+};
+$hxClasses["haxe.ui.containers._TabView.Events"] = haxe_ui_containers__$TabView_Events;
+haxe_ui_containers__$TabView_Events.__name__ = "haxe.ui.containers._TabView.Events";
+haxe_ui_containers__$TabView_Events.__super__ = haxe_ui_events_Events;
+haxe_ui_containers__$TabView_Events.prototype = $extend(haxe_ui_events_Events.prototype,{
+	_tabview: null
+	,register: function() {
+		var tabs = this._tabview.findComponent(null,haxe_ui_components_TabBar,false);
+		if(tabs.hasEvent("change",$bind(this,this.onTabChanged)) == false) {
+			tabs.registerEvent("change",$bind(this,this.onTabChanged));
+		}
+		if(tabs.hasEvent("beforeClose",$bind(this,this.onBeforeTabClosed)) == false) {
+			tabs.registerEvent("beforeClose",$bind(this,this.onBeforeTabClosed));
+		}
+		if(tabs.hasEvent("close",$bind(this,this.onTabClosed)) == false) {
+			tabs.registerEvent("close",$bind(this,this.onTabClosed));
+		}
+	}
+	,unregister: function() {
+		var tabs = this._tabview.findComponent(null,haxe_ui_components_TabBar,false);
+		tabs.unregisterEvent("change",$bind(this,this.onTabChanged));
+		tabs.unregisterEvent("beforeClose",$bind(this,this.onBeforeTabClosed));
+	}
+	,onBeforeTabClosed: function(event) {
+		this._tabview.dispatch(event);
+	}
+	,onTabClosed: function(event) {
+		var builder = js_Boot.__cast(this._tabview._compositeBuilder , haxe_ui_containers__$TabView_Builder);
+		var view = builder._views[event.data];
+		HxOverrides.remove(builder._views,view);
+		builder._content.removeComponent(view);
+		this._tabview.dispatch(new haxe_ui_events_UIEvent("close",event.data));
+	}
+	,onTabChanged: function(event) {
+		var tabs = this._tabview.findComponent(null,haxe_ui_components_TabBar,false);
+		this._tabview.set_pageIndex(-1);
+		this._tabview.set_pageIndex(tabs.get_selectedIndex());
+	}
+	,__class__: haxe_ui_containers__$TabView_Events
+});
+var haxe_ui_containers__$TabView_Builder = function(tabview) {
+	this._views = [];
+	this._currentView = null;
+	haxe_ui_core_CompositeBuilder.call(this,tabview);
+	this._tabview = tabview;
+};
+$hxClasses["haxe.ui.containers._TabView.Builder"] = haxe_ui_containers__$TabView_Builder;
+haxe_ui_containers__$TabView_Builder.__name__ = "haxe.ui.containers._TabView.Builder";
+haxe_ui_containers__$TabView_Builder.__super__ = haxe_ui_core_CompositeBuilder;
+haxe_ui_containers__$TabView_Builder.prototype = $extend(haxe_ui_core_CompositeBuilder.prototype,{
+	_tabview: null
+	,_tabs: null
+	,_content: null
+	,_currentView: null
+	,_views: null
+	,create: function() {
+		if(this._content == null) {
+			this._content = new haxe_ui_containers_Box();
+			this._content.set_id("tabview-content");
+			this._content.addClass("tabview-content");
+			this._content.set_layout(haxe_ui_layouts_LayoutFactory.createFromName("vertical"));
+			this._tabview.addComponent(this._content);
+		}
+		if(this._tabs == null) {
+			this._tabs = new haxe_ui_components_TabBar();
+			this._tabs.set_id("tabview-tabs");
+			this._tabs.addClass("tabview-tabs");
+			this._tabview.addComponent(this._tabs);
+		}
+	}
+	,get_numComponents: function() {
+		return this._views.length;
+	}
+	,addComponent: function(child) {
+		if(child != this._content && child != this._tabs) {
+			var text = child.get_text();
+			var icon = null;
+			if(((child) instanceof haxe_ui_containers_Box)) {
+				icon = (js_Boot.__cast(child , haxe_ui_containers_Box)).get_icon();
+			}
+			child.registerEvent("propertyChange",$bind(this,this.onPagePropertyChanged));
+			this._views.push(child);
+			var button = new haxe_ui_components_Button();
+			button.set_text(text);
+			button.set_icon(haxe_ui_util_Variant.fromString(icon));
+			button.set_tooltip(child.get_tooltip());
+			if(child.get_id() != null) {
+				button.set_id(child.get_id() + "_button");
+			}
+			this._tabs.addComponent(button);
+			return child;
+		}
+		return null;
+	}
+	,addComponentAt: function(child,index) {
+		if(child != this._content && child != this._tabs) {
+			var text = child.get_text();
+			var icon = null;
+			if(((child) instanceof haxe_ui_containers_Box)) {
+				icon = (js_Boot.__cast(child , haxe_ui_containers_Box)).get_icon();
+			}
+			child.registerEvent("propertyChange",$bind(this,this.onPagePropertyChanged));
+			this._views.splice(index,0,child);
+			var button = new haxe_ui_components_Button();
+			button.set_text(text);
+			button.set_icon(haxe_ui_util_Variant.fromString(icon));
+			button.set_tooltip(child.get_tooltip());
+			if(child.get_id() != null) {
+				button.set_id(child.get_id() + "_button");
+			}
+			this._tabs.addComponentAt(button,index);
+			return child;
+		}
+		return null;
+	}
+	,onPagePropertyChanged: function(event) {
+		if(event.data == "text") {
+			var index = this._views.indexOf(event.target);
+			var button = this._tabs.getTab(index);
+			if(button != null && button.get_text() != event.target.get_text()) {
+				button.set_text(event.target.get_text());
+			}
+		} else if(event.data == "icon") {
+			var index = this._views.indexOf(event.target);
+			var button = js_Boot.__cast(this._tabs.getTab(index) , haxe_ui_components_Button);
+			if(button != null && haxe_ui_util_Variant.neq(button.get_icon(),haxe_ui_util_Variant.fromString((js_Boot.__cast(event.target , haxe_ui_containers_Box)).get_icon()))) {
+				button.set_icon(haxe_ui_util_Variant.fromString((js_Boot.__cast(event.target , haxe_ui_containers_Box)).get_icon()));
+			}
+		}
+	}
+	,removeComponent: function(child,dispose,invalidate) {
+		if(invalidate == null) {
+			invalidate = true;
+		}
+		if(dispose == null) {
+			dispose = true;
+		}
+		if(child != this._content && child != this._tabs) {
+			var _g = this._views.indexOf(child);
+			if(_g != -1) {
+				var i = _g;
+				this._views.splice(i,1);
+				this._tabs.removeComponentAt(i,dispose,invalidate);
+				return child;
+			}
+		}
+		return null;
+	}
+	,removeComponentAt: function(index,dispose,invalidate) {
+		if(invalidate == null) {
+			invalidate = true;
+		}
+		if(dispose == null) {
+			dispose = true;
+		}
+		this._views.splice(index,1);
+		return this._tabs.removeComponentAt(index,dispose,invalidate);
+	}
+	,getComponentIndex: function(child) {
+		return this._views.indexOf(child);
+	}
+	,setComponentIndex: function(child,index) {
+		if(child != this._content && child != this._tabs) {
+			var _g = this._views.indexOf(child);
+			if(_g != -1) {
+				var i = _g;
+				this._views.splice(i,1);
+				this._views.splice(index,0,child);
+				this._tabs.setComponentIndex(this._tabs.getComponentAt(i),index);
+				return child;
+			}
+		}
+		return null;
+	}
+	,getComponentAt: function(index) {
+		return this._views[index];
+	}
+	,findComponent: function(criteria,type,recursive,searchType) {
+		var match = haxe_ui_core_CompositeBuilder.prototype.findComponent.call(this,criteria,type,recursive,searchType);
+		if(match == null) {
+			var _g = 0;
+			var _g1 = this._views;
+			while(_g < _g1.length) {
+				var view = _g1[_g];
+				++_g;
+				match = view.findComponent(criteria,type,recursive,searchType);
+				if(view.matchesSearch(criteria,type,searchType)) {
+					return view;
+				} else {
+					match = view.findComponent(criteria,type,recursive,searchType);
+				}
+				if(match != null) {
+					break;
+				}
+			}
+		}
+		return match;
+	}
+	,__class__: haxe_ui_containers__$TabView_Builder
+});
+var haxe_ui_containers_dialogs_DialogButton = {};
+haxe_ui_containers_dialogs_DialogButton.bitOr = function(lhs,rhs) {
+	var larr = haxe_ui_containers_dialogs_DialogButton.toString(lhs).split("|");
+	var rarr = haxe_ui_containers_dialogs_DialogButton.toString(rhs).split("|");
+	var _g = 0;
+	while(_g < rarr.length) {
+		var r = rarr[_g];
+		++_g;
+		if(larr.indexOf(r) == -1) {
+			larr.push(r);
+		}
+	}
+	return larr.join("|");
+};
+haxe_ui_containers_dialogs_DialogButton.eq = function(lhs,rhs) {
+	var larr = haxe_ui_containers_dialogs_DialogButton.toString(lhs).split("|");
+	return larr.indexOf(haxe_ui_containers_dialogs_DialogButton.toString(rhs)) != -1;
+};
+haxe_ui_containers_dialogs_DialogButton.toArray = function(this1) {
+	var a = [];
+	var _g = 0;
+	var _g1 = (this1 == null ? "null" : "" + this1).split("|");
+	while(_g < _g1.length) {
+		var i = _g1[_g];
+		++_g;
+		i = StringTools.trim(i);
+		if(i.length == 0 || i == "null") {
+			continue;
+		}
+		a.push(i);
+	}
+	return a;
+};
+haxe_ui_containers_dialogs_DialogButton.toString = function(this1) {
+	if(this1 == null) {
+		return "null";
+	} else {
+		return "" + this1;
+	}
+};
+var haxe_ui_containers_dialogs_DialogEvent = function(type,bubble,data) {
+	haxe_ui_events_UIEvent.call(this,type,bubble,data);
+};
+$hxClasses["haxe.ui.containers.dialogs.DialogEvent"] = haxe_ui_containers_dialogs_DialogEvent;
+haxe_ui_containers_dialogs_DialogEvent.__name__ = "haxe.ui.containers.dialogs.DialogEvent";
+haxe_ui_containers_dialogs_DialogEvent.__super__ = haxe_ui_events_UIEvent;
+haxe_ui_containers_dialogs_DialogEvent.prototype = $extend(haxe_ui_events_UIEvent.prototype,{
+	button: null
+	,clone: function() {
+		var c = new haxe_ui_containers_dialogs_DialogEvent(this.type);
+		c.type = this.type;
+		c.bubble = this.bubble;
+		c.target = this.target;
+		c.data = this.data;
+		c.canceled = this.canceled;
+		c.button = this.button;
+		this.postClone(c);
+		return c;
+	}
+	,__class__: haxe_ui_containers_dialogs_DialogEvent
+});
+var haxe_ui_containers_dialogs_MessageBoxType = {};
+haxe_ui_containers_dialogs_MessageBoxType.toString = function(this1) {
+	if(this1 == null) {
+		return "null";
+	} else {
+		return "" + this1;
+	}
+};
+var haxe_ui_containers_dialogs_MessageBox = function() {
+	haxe_ui_backend_MessageBoxBase.call(this);
+	this.set_title("Message");
+};
+$hxClasses["haxe.ui.containers.dialogs.MessageBox"] = haxe_ui_containers_dialogs_MessageBox;
+haxe_ui_containers_dialogs_MessageBox.__name__ = "haxe.ui.containers.dialogs.MessageBox";
+haxe_ui_containers_dialogs_MessageBox.__super__ = haxe_ui_backend_MessageBoxBase;
+haxe_ui_containers_dialogs_MessageBox.prototype = $extend(haxe_ui_backend_MessageBoxBase.prototype,{
+	onInitialize: function() {
+		haxe_ui_backend_MessageBoxBase.prototype.onInitialize.call(this);
+		if(haxe_ui_containers_dialogs_DialogButton.toArray(this.buttons).length == 0) {
+			switch(this.get_type()) {
+			case "error":
+				this.buttons = "{{dialog.close}}";
+				break;
+			case "info":
+				this.buttons = "{{dialog.ok}}";
+				break;
+			case "question":
+				var larr = "{{dialog.yes}}".split("|");
+				var rarr = "{{dialog.no}}".split("|");
+				var _g = 0;
+				while(_g < rarr.length) {
+					var r = rarr[_g];
+					++_g;
+					if(larr.indexOf(r) == -1) {
+						larr.push(r);
+					}
+				}
+				var larr1 = haxe_ui_containers_dialogs_DialogButton.toString(larr.join("|")).split("|");
+				var rarr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.cancel}}").split("|");
+				var _g = 0;
+				while(_g < rarr.length) {
+					var r = rarr[_g];
+					++_g;
+					if(larr1.indexOf(r) == -1) {
+						larr1.push(r);
+					}
+				}
+				this.buttons = larr1.join("|");
+				break;
+			case "warning":
+				this.buttons = "{{dialog.close}}";
+				break;
+			case "yesno":
+				var larr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.yes}}").split("|");
+				var rarr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.no}}").split("|");
+				var _g = 0;
+				while(_g < rarr.length) {
+					var r = rarr[_g];
+					++_g;
+					if(larr.indexOf(r) == -1) {
+						larr.push(r);
+					}
+				}
+				this.buttons = larr.join("|");
+				break;
+			}
+			this.createButtons();
+		}
+		if(this.get_title() == "Message") {
+			switch(this.get_type()) {
+			case "error":
+				this.set_title("Error");
+				break;
+			case "info":
+				this.set_title("Info");
+				break;
+			case "question":
+				this.set_title("Question");
+				break;
+			case "warning":
+				this.set_title("Warning");
+				break;
+			case "yesno":
+				this.set_title("Question");
+				break;
+			}
+		}
+	}
+	,registerBehaviours: function() {
+		haxe_ui_backend_MessageBoxBase.prototype.registerBehaviours.call(this);
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_backend_MessageBoxBase.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_containers_dialogs_MessageBox();
+	}
+	,__class__: haxe_ui_containers_dialogs_MessageBox
 });
 var haxe_ui_core_ItemRenderer = function() {
 	this._fieldList = null;
@@ -11047,6 +18496,298 @@ haxe_ui_core_ItemRenderer.prototype = $extend(haxe_ui_containers_Box.prototype,{
 	}
 	,__class__: haxe_ui_core_ItemRenderer
 	,__properties__: $extend(haxe_ui_containers_Box.prototype.__properties__,{set_data:"set_data",get_data:"get_data",set_allowHover:"set_allowHover",get_allowHover:"get_allowHover"})
+});
+var haxe_ui_core_BasicItemRenderer = function() {
+	haxe_ui_core_ItemRenderer.call(this);
+	var hbox = new haxe_ui_containers_HBox();
+	hbox.addClass("basic-renderer-container");
+	var icon = new haxe_ui_components_Image();
+	icon.set_id("icon");
+	icon.addClass("basic-renderer-icon");
+	icon.set_verticalAlign("center");
+	icon.hide();
+	hbox.addComponent(icon);
+	var label = new haxe_ui_components_Label();
+	label.set_id("text");
+	label.addClass("basic-renderer-label");
+	label.set_verticalAlign("center");
+	label.hide();
+	hbox.addComponent(label);
+	this.addComponent(hbox);
+};
+$hxClasses["haxe.ui.core.BasicItemRenderer"] = haxe_ui_core_BasicItemRenderer;
+haxe_ui_core_BasicItemRenderer.__name__ = "haxe.ui.core.BasicItemRenderer";
+haxe_ui_core_BasicItemRenderer.__super__ = haxe_ui_core_ItemRenderer;
+haxe_ui_core_BasicItemRenderer.prototype = $extend(haxe_ui_core_ItemRenderer.prototype,{
+	registerBehaviours: function() {
+		haxe_ui_core_ItemRenderer.prototype.registerBehaviours.call(this);
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_core_ItemRenderer.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new haxe_ui_core_BasicItemRenderer();
+	}
+	,__class__: haxe_ui_core_BasicItemRenderer
+});
+var haxe_ui_core_ComponentTextBehaviour = function(component) {
+	haxe_ui_behaviours_DefaultBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.core.ComponentTextBehaviour"] = haxe_ui_core_ComponentTextBehaviour;
+haxe_ui_core_ComponentTextBehaviour.__name__ = "haxe.ui.core.ComponentTextBehaviour";
+haxe_ui_core_ComponentTextBehaviour.__super__ = haxe_ui_behaviours_DefaultBehaviour;
+haxe_ui_core_ComponentTextBehaviour.prototype = $extend(haxe_ui_behaviours_DefaultBehaviour.prototype,{
+	set: function(value) {
+		if(haxe_ui_util_Variant.eq(value,this._value)) {
+			return;
+		}
+		this._value = value;
+		haxe_ui_behaviours_DefaultBehaviour.prototype.set.call(this,value);
+	}
+	,__class__: haxe_ui_core_ComponentTextBehaviour
+});
+var haxe_ui_core_ComponentDisabledBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+	this._value = haxe_ui_util_Variant.fromBool(false);
+};
+$hxClasses["haxe.ui.core.ComponentDisabledBehaviour"] = haxe_ui_core_ComponentDisabledBehaviour;
+haxe_ui_core_ComponentDisabledBehaviour.__name__ = "haxe.ui.core.ComponentDisabledBehaviour";
+haxe_ui_core_ComponentDisabledBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_core_ComponentDisabledBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		if(this._value != null && haxe_ui_util_Variant.get_isNull(this._value) == false) {
+			this._component.disableInteractivity(haxe_ui_util_Variant.toBool(this._value),true,true);
+		}
+	}
+	,__class__: haxe_ui_core_ComponentDisabledBehaviour
+});
+var haxe_ui_core_ComponentValueBehaviour = function(component) {
+	haxe_ui_behaviours_ValueBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.core.ComponentValueBehaviour"] = haxe_ui_core_ComponentValueBehaviour;
+haxe_ui_core_ComponentValueBehaviour.__name__ = "haxe.ui.core.ComponentValueBehaviour";
+haxe_ui_core_ComponentValueBehaviour.__super__ = haxe_ui_behaviours_ValueBehaviour;
+haxe_ui_core_ComponentValueBehaviour.prototype = $extend(haxe_ui_behaviours_ValueBehaviour.prototype,{
+	set: function(value) {
+		if(haxe_ui_util_Variant.eq(value,this._value)) {
+			return;
+		}
+		this._value = value;
+		this._component.set_text(haxe_ui_util_Variant.toString(value));
+	}
+	,get: function() {
+		return this._value;
+	}
+	,getDynamic: function() {
+		return haxe_ui_util_Variant.toDynamic(this._value);
+	}
+	,__class__: haxe_ui_core_ComponentValueBehaviour
+});
+var haxe_ui_core_ComponentToolTipBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.core.ComponentToolTipBehaviour"] = haxe_ui_core_ComponentToolTipBehaviour;
+haxe_ui_core_ComponentToolTipBehaviour.__name__ = "haxe.ui.core.ComponentToolTipBehaviour";
+haxe_ui_core_ComponentToolTipBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_core_ComponentToolTipBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		if(this._value == null || haxe_ui_util_Variant.get_isNull(this._value)) {
+			haxe_ui_tooltips_ToolTipManager.get_instance().unregisterTooltip(this._component);
+		} else {
+			haxe_ui_tooltips_ToolTipManager.get_instance().registerTooltip(this._component,{ tipData : haxe_ui_util_Variant.toDynamic(this._value), renderer : this._component.get_tooltipRenderer()});
+		}
+	}
+	,setDynamic: function(value) {
+		if(value == null) {
+			haxe_ui_tooltips_ToolTipManager.get_instance().unregisterTooltip(this._component);
+		} else {
+			haxe_ui_tooltips_ToolTipManager.get_instance().registerTooltip(this._component,{ tipData : value, renderer : this._component.get_tooltipRenderer()});
+		}
+	}
+	,getDynamic: function() {
+		var options = haxe_ui_tooltips_ToolTipManager.get_instance().getTooltipOptions(this._component);
+		if(options == null) {
+			return null;
+		}
+		return options.tipData;
+	}
+	,__class__: haxe_ui_core_ComponentToolTipBehaviour
+});
+var haxe_ui_core_ComponentToolTipRendererBehaviour = function(component) {
+	haxe_ui_behaviours_DataBehaviour.call(this,component);
+};
+$hxClasses["haxe.ui.core.ComponentToolTipRendererBehaviour"] = haxe_ui_core_ComponentToolTipRendererBehaviour;
+haxe_ui_core_ComponentToolTipRendererBehaviour.__name__ = "haxe.ui.core.ComponentToolTipRendererBehaviour";
+haxe_ui_core_ComponentToolTipRendererBehaviour.__super__ = haxe_ui_behaviours_DataBehaviour;
+haxe_ui_core_ComponentToolTipRendererBehaviour.prototype = $extend(haxe_ui_behaviours_DataBehaviour.prototype,{
+	validateData: function() {
+		if(this._value == null || haxe_ui_util_Variant.get_isNull(this._value)) {
+			haxe_ui_tooltips_ToolTipManager.get_instance().updateTooltipRenderer(this._component,null);
+		} else {
+			haxe_ui_tooltips_ToolTipManager.get_instance().updateTooltipRenderer(this._component,haxe_ui_util_Variant.toComponent(this._value));
+		}
+	}
+	,__class__: haxe_ui_core_ComponentToolTipRendererBehaviour
+});
+var haxe_ui_core_ImageDisplay = function() {
+	this._isValidating = false;
+	this._isAllInvalid = false;
+	this._invalidationFlags = new haxe_ds_StringMap();
+	haxe_ui_backend_ImageDisplayImpl.call(this);
+};
+$hxClasses["haxe.ui.core.ImageDisplay"] = haxe_ui_core_ImageDisplay;
+haxe_ui_core_ImageDisplay.__name__ = "haxe.ui.core.ImageDisplay";
+haxe_ui_core_ImageDisplay.__super__ = haxe_ui_backend_ImageDisplayImpl;
+haxe_ui_core_ImageDisplay.prototype = $extend(haxe_ui_backend_ImageDisplayImpl.prototype,{
+	_invalidationFlags: null
+	,_isAllInvalid: null
+	,_isValidating: null
+	,get_left: function() {
+		return this._left;
+	}
+	,set_left: function(value) {
+		if(value == this._left) {
+			return value;
+		}
+		this._left = value;
+		this.invalidateComponent("position");
+		return value;
+	}
+	,get_top: function() {
+		return this._top;
+	}
+	,set_top: function(value) {
+		if(value == this._top) {
+			return value;
+		}
+		this._top = value;
+		this.invalidateComponent("position");
+		return value;
+	}
+	,set_imageWidth: function(value) {
+		if(this._imageWidth == value || value <= 0) {
+			return value;
+		}
+		this._imageWidth = value;
+		this.invalidateComponent("display");
+		return value;
+	}
+	,get_imageWidth: function() {
+		return this._imageWidth;
+	}
+	,set_imageHeight: function(value) {
+		if(this._imageHeight == value || value <= 0) {
+			return value;
+		}
+		this._imageHeight = value;
+		this.invalidateComponent("display");
+		return value;
+	}
+	,get_imageHeight: function() {
+		return this._imageHeight;
+	}
+	,get_imageInfo: function() {
+		return this._imageInfo;
+	}
+	,set_imageInfo: function(value) {
+		if(value == this._imageInfo) {
+			return value;
+		}
+		this._imageInfo = value;
+		this._imageWidth = this._imageInfo.width;
+		this._imageHeight = this._imageInfo.height;
+		this.invalidateComponent("data");
+		this.invalidateComponent("display");
+		return value;
+	}
+	,get_imageClipRect: function() {
+		return this._imageClipRect;
+	}
+	,set_imageClipRect: function(value) {
+		this._imageClipRect = value;
+		this.invalidateComponent("display");
+		return value;
+	}
+	,isComponentInvalid: function(flag) {
+		if(flag == null) {
+			flag = "all";
+		}
+		if(this._isAllInvalid == true) {
+			return true;
+		}
+		if(flag == "all") {
+			var h = this._invalidationFlags.h;
+			var value_h = h;
+			var value_keys = Object.keys(h);
+			var value_length = value_keys.length;
+			var value_current = 0;
+			while(value_current < value_length) {
+				var value = value_h[value_keys[value_current++]];
+				return true;
+			}
+			return false;
+		}
+		return Object.prototype.hasOwnProperty.call(this._invalidationFlags.h,flag);
+	}
+	,invalidateComponent: function(flag) {
+		if(flag == null) {
+			flag = "all";
+		}
+		if(flag == "all") {
+			this._isAllInvalid = true;
+			this.parentComponent.invalidateComponent("imageDisplay");
+		} else if(!Object.prototype.hasOwnProperty.call(this._invalidationFlags.h,flag)) {
+			this._invalidationFlags.h[flag] = true;
+			this.parentComponent.invalidateComponent("imageDisplay");
+		}
+	}
+	,validateComponent: function() {
+		if(this._isValidating == true || this.isComponentInvalid() == false) {
+			return;
+		}
+		this._isValidating = true;
+		this.handleValidate();
+		var h = this._invalidationFlags.h;
+		var flag_h = h;
+		var flag_keys = Object.keys(h);
+		var flag_length = flag_keys.length;
+		var flag_current = 0;
+		while(flag_current < flag_length) {
+			var flag = flag_keys[flag_current++];
+			var _this = this._invalidationFlags;
+			if(Object.prototype.hasOwnProperty.call(_this.h,flag)) {
+				delete(_this.h[flag]);
+			}
+		}
+		this._isAllInvalid = false;
+		this._isValidating = false;
+	}
+	,handleValidate: function() {
+		var dataInvalid = this.isComponentInvalid("data");
+		var positionInvalid = this.isComponentInvalid("position");
+		var displayInvalid = this.isComponentInvalid("display");
+		if(dataInvalid) {
+			this.validateData();
+		}
+		if(positionInvalid) {
+			this.validatePosition();
+		}
+		if(displayInvalid) {
+			this.validateDisplay();
+		}
+	}
+	,__class__: haxe_ui_core_ImageDisplay
+	,__properties__: {set_imageClipRect:"set_imageClipRect",get_imageClipRect:"get_imageClipRect",set_imageInfo:"set_imageInfo",get_imageInfo:"get_imageInfo",set_imageHeight:"set_imageHeight",get_imageHeight:"get_imageHeight",set_imageWidth:"set_imageWidth",get_imageWidth:"get_imageWidth",set_top:"set_top",get_top:"get_top",set_left:"set_left",get_left:"get_left"}
 });
 var haxe_ui_core_Platform = function() {
 	haxe_ui_backend_PlatformImpl.call(this);
@@ -12004,6 +19745,129 @@ haxe_ui_data_DataSource.prototype = {
 	,__class__: haxe_ui_data_DataSource
 	,__properties__: {get_size:"get_size",set_data:"set_data",get_data:"get_data",set_allowCallbacks:"set_allowCallbacks",get_allowCallbacks:"get_allowCallbacks"}
 };
+var haxe_ui_data_ArrayDataSource = function(transformer) {
+	this._filterFn = null;
+	this._filteredArray = null;
+	haxe_ui_data_DataSource.call(this,transformer);
+	this._array = [];
+};
+$hxClasses["haxe.ui.data.ArrayDataSource"] = haxe_ui_data_ArrayDataSource;
+haxe_ui_data_ArrayDataSource.__name__ = "haxe.ui.data.ArrayDataSource";
+haxe_ui_data_ArrayDataSource.fromArray = function(source,transformer) {
+	var ds = new haxe_ui_data_ArrayDataSource(transformer);
+	ds._array = source;
+	return ds;
+};
+haxe_ui_data_ArrayDataSource.__super__ = haxe_ui_data_DataSource;
+haxe_ui_data_ArrayDataSource.prototype = $extend(haxe_ui_data_DataSource.prototype,{
+	_array: null
+	,_filteredArray: null
+	,clearFilter: function() {
+		this._filterFn = null;
+		this._filteredArray = null;
+		this.handleChanged();
+	}
+	,_filterFn: null
+	,filter: function(fn) {
+		this._filterFn = fn;
+		this._filteredArray = [];
+		var index = 0;
+		var _g = 0;
+		var _g1 = this._array;
+		while(_g < _g1.length) {
+			var item = _g1[_g];
+			++_g;
+			if(fn(index,item) == true) {
+				this._filteredArray.push(item);
+			}
+			++index;
+		}
+		this.handleChanged();
+	}
+	,sortCustom: function(fn) {
+		this._array.sort(fn);
+		this.handleChanged();
+	}
+	,handleGetSize: function() {
+		if(this._filteredArray != null) {
+			return this._filteredArray.length;
+		}
+		return this._array.length;
+	}
+	,handleGetItem: function(index) {
+		if(this._filteredArray != null) {
+			return this._filteredArray[index];
+		}
+		return this._array[index];
+	}
+	,handleIndexOf: function(item) {
+		if(this._filteredArray != null) {
+			return this._filteredArray.indexOf(item);
+		}
+		return this._array.indexOf(item);
+	}
+	,handleAddItem: function(item) {
+		this._array.push(item);
+		if(this._filteredArray != null && this._filterFn != null) {
+			if(this._filterFn(this._array.length - 1,item) == true) {
+				this._filteredArray.push(item);
+			}
+		}
+		return item;
+	}
+	,handleInsert: function(index,item) {
+		this._array.splice(index,0,item);
+		if(this._filteredArray != null && this._filterFn != null) {
+			if(this._filterFn(index,item) == true) {
+				this._filteredArray.push(item);
+			}
+		}
+		return item;
+	}
+	,handleRemoveItem: function(item) {
+		HxOverrides.remove(this._array,item);
+		if(this._filteredArray != null) {
+			HxOverrides.remove(this._filteredArray,item);
+		}
+		return item;
+	}
+	,handleClear: function() {
+		while(this._array.length > 0) this._array.pop();
+		if(this._filteredArray != null) {
+			while(this._filteredArray.length > 0) this._filteredArray.pop();
+		}
+	}
+	,handleGetData: function() {
+		if(this._filteredArray != null) {
+			return this._filteredArray;
+		}
+		return this._array;
+	}
+	,handleSetData: function(v) {
+		this._array = v;
+		if(this._filterFn != null) {
+			this.filter(this._filterFn);
+		}
+	}
+	,handleUpdateItem: function(index,item) {
+		if(this._filteredArray != null) {
+			return this._filteredArray[index] = item;
+		}
+		return this._array[index] = item;
+	}
+	,clone: function() {
+		var c = new haxe_ui_data_ArrayDataSource();
+		c._array = this._array.slice();
+		if(this._filteredArray != null) {
+			c._filteredArray = this._filteredArray.slice();
+		}
+		if(this._filterFn != null) {
+			c._filterFn = this._filterFn;
+		}
+		return c;
+	}
+	,__class__: haxe_ui_data_ArrayDataSource
+});
 var haxe_ui_data_IDataItem = function() { };
 $hxClasses["haxe.ui.data.IDataItem"] = haxe_ui_data_IDataItem;
 haxe_ui_data_IDataItem.__name__ = "haxe.ui.data.IDataItem";
@@ -12176,40 +20040,6 @@ haxe_ui_dragdrop_DragManager.prototype = {
 	}
 	,__class__: haxe_ui_dragdrop_DragManager
 };
-var haxe_ui_events_UIEvent = function(type,bubble,data) {
-	if(bubble == null) {
-		bubble = false;
-	}
-	this.type = type;
-	this.bubble = bubble;
-	this.data = data;
-	this.canceled = false;
-};
-$hxClasses["haxe.ui.events.UIEvent"] = haxe_ui_events_UIEvent;
-haxe_ui_events_UIEvent.__name__ = "haxe.ui.events.UIEvent";
-haxe_ui_events_UIEvent.__super__ = haxe_ui_backend_EventImpl;
-haxe_ui_events_UIEvent.prototype = $extend(haxe_ui_backend_EventImpl.prototype,{
-	bubble: null
-	,type: null
-	,target: null
-	,data: null
-	,canceled: null
-	,cancel: function() {
-		haxe_ui_backend_EventImpl.prototype.cancel.call(this);
-		this.canceled = true;
-	}
-	,clone: function() {
-		var c = new haxe_ui_events_UIEvent(this.type);
-		c.type = this.type;
-		c.bubble = this.bubble;
-		c.target = this.target;
-		c.data = this.data;
-		c.canceled = this.canceled;
-		this.postClone(c);
-		return c;
-	}
-	,__class__: haxe_ui_events_UIEvent
-});
 var haxe_ui_events_AnimationEvent = function(type) {
 	haxe_ui_events_UIEvent.call(this,type);
 };
@@ -13030,70 +20860,6 @@ haxe_ui_layouts_DelegateLayoutSize.prototype = {
 	,__class__: haxe_ui_layouts_DelegateLayoutSize
 	,__properties__: {get_usableHeightModifier:"get_usableHeightModifier",get_usableWidthModifier:"get_usableWidthModifier",get_height:"get_height",get_width:"get_width"}
 };
-var haxe_ui_layouts_HorizontalLayout = function() {
-	haxe_ui_layouts_DefaultLayout.call(this);
-	this._calcFullWidths = true;
-};
-$hxClasses["haxe.ui.layouts.HorizontalLayout"] = haxe_ui_layouts_HorizontalLayout;
-haxe_ui_layouts_HorizontalLayout.__name__ = "haxe.ui.layouts.HorizontalLayout";
-haxe_ui_layouts_HorizontalLayout.__super__ = haxe_ui_layouts_DefaultLayout;
-haxe_ui_layouts_HorizontalLayout.prototype = $extend(haxe_ui_layouts_DefaultLayout.prototype,{
-	repositionChildren: function() {
-		var xpos = this.get_paddingLeft();
-		var _g = 0;
-		var _this = this.get_component();
-		var _g1 = _this._children == null ? [] : _this._children;
-		while(_g < _g1.length) {
-			var child = _g1[_g];
-			++_g;
-			if(child.get_includeInLayout() == false) {
-				continue;
-			}
-			var ypos = 0;
-			switch(this.verticalAlign(child)) {
-			case "bottom":
-				if(child.get_componentHeight() < this.get_component().get_componentHeight()) {
-					ypos = this.get_component().get_componentHeight() - (child.get_componentHeight() + this.get_paddingBottom() + this.marginTop(child));
-				}
-				break;
-			case "center":
-				ypos = (this.get_component().get_componentHeight() - child.get_componentHeight()) / 2 + this.marginTop(child) - this.marginBottom(child);
-				break;
-			default:
-				ypos = this.get_paddingTop() + this.marginTop(child);
-			}
-			child.moveComponent(xpos + this.marginLeft(child),ypos);
-			xpos += child.get_componentWidth() + this.get_horizontalSpacing();
-		}
-	}
-	,get_usableSize: function() {
-		var size = haxe_ui_layouts_DefaultLayout.prototype.get_usableSize.call(this);
-		var _this = this.get_component();
-		var visibleChildren = (_this._children == null ? [] : _this._children).length;
-		var _g = 0;
-		var _this = this.get_component();
-		var _g1 = _this._children == null ? [] : _this._children;
-		while(_g < _g1.length) {
-			var child = _g1[_g];
-			++_g;
-			if(child.get_includeInLayout() == false) {
-				--visibleChildren;
-				continue;
-			}
-			if(child.get_componentWidth() > 0 && (child.get_percentWidth() == null || this.fixedMinWidth(child) == true)) {
-				size.width -= child.get_componentWidth() + this.marginLeft(child) + this.marginRight(child);
-			}
-		}
-		if(visibleChildren > 1) {
-			size.width -= this.get_horizontalSpacing() * (visibleChildren - 1);
-		}
-		if(size.width < 0) {
-			size.width = 0;
-		}
-		return size;
-	}
-	,__class__: haxe_ui_layouts_HorizontalLayout
-});
 var haxe_ui_layouts_HorizontalContinuousLayout = function() {
 	haxe_ui_layouts_HorizontalLayout.call(this);
 };
@@ -13615,430 +21381,124 @@ haxe_ui_layouts_LayoutFactory.createFromName = function(name) {
 	}
 	return new haxe_ui_layouts_DefaultLayout();
 };
-var haxe_ui_layouts_VerticalGridLayout = function() {
-	this._columns = 1;
-	haxe_ui_layouts_Layout.call(this);
+var haxe_ui_layouts_ScrollViewLayout = function() {
+	haxe_ui_layouts_DefaultLayout.call(this);
 };
-$hxClasses["haxe.ui.layouts.VerticalGridLayout"] = haxe_ui_layouts_VerticalGridLayout;
-haxe_ui_layouts_VerticalGridLayout.__name__ = "haxe.ui.layouts.VerticalGridLayout";
-haxe_ui_layouts_VerticalGridLayout.__super__ = haxe_ui_layouts_Layout;
-haxe_ui_layouts_VerticalGridLayout.prototype = $extend(haxe_ui_layouts_Layout.prototype,{
-	_columns: null
-	,get_columns: function() {
-		return this._columns;
-	}
-	,set_columns: function(value) {
-		if(this._columns == value) {
-			return value;
+$hxClasses["haxe.ui.layouts.ScrollViewLayout"] = haxe_ui_layouts_ScrollViewLayout;
+haxe_ui_layouts_ScrollViewLayout.__name__ = "haxe.ui.layouts.ScrollViewLayout";
+haxe_ui_layouts_ScrollViewLayout.__super__ = haxe_ui_layouts_DefaultLayout;
+haxe_ui_layouts_ScrollViewLayout.prototype = $extend(haxe_ui_layouts_DefaultLayout.prototype,{
+	repositionChildren: function() {
+		var contents = this.get_component().findComponent("scrollview-contents",null,false,"css");
+		if(contents == null) {
+			return;
 		}
-		this._columns = value;
-		if(this._component != null) {
-			var _this = this._component;
-			if(!(_this._layout == null || _this._layoutLocked == true)) {
-				_this.invalidateComponent("layout",false);
-			}
+		var hscroll = this.get_component().findComponent(null,haxe_ui_components_HorizontalScroll,false);
+		var vscroll = this.get_component().findComponent(null,haxe_ui_components_VerticalScroll,false);
+		var borderSize = this.get_borderSize();
+		if(hscroll != null && this.hidden(hscroll) == false) {
+			hscroll.moveComponent(this.get_paddingLeft() + borderSize,Math.round(this.get_component().get_componentHeight() - hscroll.get_componentHeight() - this.get_paddingBottom() + this.marginTop(hscroll) - borderSize));
 		}
-		return value;
-	}
-	,get_usableSize: function() {
-		var size = haxe_ui_layouts_Layout.prototype.get_usableSize.call(this);
-		var columnWidths = this.calcColumnWidths(size,false);
-		var rowHeights = this.calcRowHeights(size,false);
-		var _g = 0;
-		while(_g < columnWidths.length) {
-			var columnWidth = columnWidths[_g];
-			++_g;
-			size.width -= columnWidth;
+		if(vscroll != null && this.hidden(vscroll) == false) {
+			vscroll.moveComponent(Math.round(this.get_component().get_componentWidth() - vscroll.get_componentWidth() - this.get_paddingRight() + this.marginLeft(vscroll)) - borderSize,this.get_paddingTop() + borderSize);
 		}
-		var _g = 0;
-		while(_g < rowHeights.length) {
-			var rowHeight = rowHeights[_g];
-			++_g;
-			size.height -= rowHeight;
+		var contents = this.get_component().findComponent("scrollview-contents",null,false,"css");
+		if(contents != null) {
+			contents.moveComponent(this.get_paddingLeft() + borderSize,this.get_paddingTop() + borderSize);
 		}
-		var _this = this.get_component();
-		if((_this._children == null ? [] : _this._children).length > 1) {
-			var _this = this.get_component();
-			var rows = Math.ceil((_this._children == null ? [] : _this._children).length / this.get_columns());
-			var c = this.get_columns();
-			var _this = this.get_component();
-			var c1 = Math.min(c,(_this._children == null ? [] : _this._children).length);
-			size.width -= this.get_horizontalSpacing() * (c1 - 1);
-			size.height -= this.get_verticalSpacing() * (rows - 1);
-		}
-		if(size.width < 0) {
-			size.width = 0;
-		}
-		if(size.height < 0) {
-			size.height = 0;
-		}
-		return size;
 	}
 	,resizeChildren: function() {
-		var size = this.get_usableSize();
-		var columnWidths = this.calcColumnWidths(size,true);
-		var rowHeights = this.calcRowHeights(size,true);
-		var explicitWidths = this.calcExplicitWidths();
-		var explicitHeights = this.calcExplicitHeights();
-		var rowIndex = 0;
-		var columnIndex = 0;
+		haxe_ui_layouts_DefaultLayout.prototype.resizeChildren.call(this);
+		var scrollview = js_Boot.__cast(this._component , haxe_ui_containers_ScrollView);
+		var hscroll = this.get_component().findComponent(null,haxe_ui_components_HorizontalScroll,false);
+		var vscroll = this.get_component().findComponent(null,haxe_ui_components_VerticalScroll,false);
+		var usableSize = this.get_usableSize();
+		var percentWidth = 100;
+		var percentHeight = 100;
 		var _g = 0;
 		var _this = this.get_component();
 		var _g1 = _this._children == null ? [] : _this._children;
 		while(_g < _g1.length) {
 			var child = _g1[_g];
 			++_g;
-			if(child.get_includeInLayout() == false) {
+			if(child != hscroll && child != vscroll) {
 				continue;
 			}
 			var cx = null;
 			var cy = null;
 			if(child.get_percentWidth() != null) {
-				var ucx = columnWidths[columnIndex];
-				if(explicitWidths[columnIndex] == false) {
-					cx = ucx;
-				} else {
-					cx = ucx * child.get_percentWidth() / 100;
-				}
+				cx = usableSize.width * child.get_percentWidth() / percentWidth - this.marginLeft(child) - this.marginRight(child);
 			}
 			if(child.get_percentHeight() != null) {
-				var ucy = rowHeights[rowIndex];
-				if(explicitHeights[rowIndex] == false) {
-					cy = ucy;
-				} else {
-					cy = ucy * child.get_percentHeight() / 100;
+				cy = usableSize.height * child.get_percentHeight() / percentHeight - this.marginTop(child) - this.marginBottom(child);
+			}
+			if(this.fixedMinWidth(child) && child.get_percentWidth() != null) {
+				percentWidth -= child.get_percentWidth();
+			}
+			if(this.fixedMinHeight(child) && child.get_percentHeight() != null) {
+				percentHeight -= child.get_percentHeight();
+			}
+			if(scrollview.get_autoHideScrolls() == true) {
+				if(child == hscroll && vscroll != null && vscroll.get_hidden() == false) {
+					cx -= vscroll.get_width();
+				} else if(child == vscroll && hscroll != null && hscroll.get_hidden() == false) {
+					cy -= hscroll.get_height();
 				}
 			}
 			child.resizeComponent(cx,cy);
-			++columnIndex;
-			if(columnIndex >= this._columns) {
-				columnIndex = 0;
-				++rowIndex;
-			}
 		}
 	}
-	,repositionChildren: function() {
-		var size = this.get_usableSize();
-		var columnWidths = this.calcColumnWidths(size,true);
-		var rowHeights = this.calcRowHeights(size,true);
-		var rowIndex = 0;
-		var columnIndex = 0;
-		var xpos = this.get_paddingLeft();
-		var ypos = this.get_paddingTop();
-		var _g = 0;
-		var _this = this.get_component();
-		var _g1 = _this._children == null ? [] : _this._children;
-		while(_g < _g1.length) {
-			var child = _g1[_g];
-			++_g;
-			if(child.get_includeInLayout() == false) {
-				continue;
-			}
-			var halign = this.horizontalAlign(child);
-			var valign = this.verticalAlign(child);
-			var xposChild = 0;
-			var yposChild = 0;
-			switch(halign) {
-			case "center":
-				xposChild = xpos + (columnWidths[columnIndex] - child.get_componentWidth()) * 0.5 + this.marginLeft(child) - this.marginRight(child);
-				break;
-			case "right":
-				xposChild = xpos + (columnWidths[columnIndex] - child.get_componentWidth()) + this.marginLeft(child) - this.marginRight(child);
-				break;
-			default:
-				xposChild = xpos + this.marginLeft(child) - this.marginRight(child);
-			}
-			switch(valign) {
-			case "bottom":
-				yposChild = ypos + (rowHeights[rowIndex] - child.get_componentHeight()) + this.marginTop(child) - this.marginBottom(child);
-				break;
-			case "center":
-				yposChild = ypos + (rowHeights[rowIndex] - child.get_componentHeight()) * 0.5 + this.marginTop(child) - this.marginBottom(child);
-				break;
-			default:
-				yposChild = ypos + this.marginTop(child) - this.marginBottom(child);
-			}
-			child.moveComponent(xposChild,yposChild);
-			xpos += columnWidths[columnIndex] + this.get_horizontalSpacing();
-			++columnIndex;
-			if(columnIndex >= this.get_columns()) {
-				xpos = this.get_paddingLeft();
-				ypos += rowHeights[rowIndex] + this.get_verticalSpacing();
-				columnIndex = 0;
-				++rowIndex;
+	,get_usableSize: function() {
+		var size = haxe_ui_layouts_DefaultLayout.prototype.get_usableSize.call(this);
+		var hscroll = this.get_component().findComponent(null,haxe_ui_components_HorizontalScroll,false);
+		var vscroll = this.get_component().findComponent(null,haxe_ui_components_VerticalScroll,false);
+		if(hscroll != null && hscroll.get_includeInLayout() == true && this.hidden(hscroll) == false) {
+			size.height -= hscroll.get_componentHeight() - this.marginTop(hscroll);
+		}
+		if(vscroll != null && vscroll.get_includeInLayout() == true && this.hidden(vscroll) == false) {
+			size.width -= vscroll.get_componentWidth() - this.marginLeft(vscroll);
+		}
+		if((js_Boot.__cast(this.get_component() , haxe_ui_containers_ScrollView)).get_native() == true || this._component.get_isNativeScroller() == true) {
+			var contents = this.get_component().findComponent("scrollview-contents",null,false,"css");
+			if(contents != null) {
+				if(contents.get_componentWidth() > size.width) {
+					size.height -= haxe_ui_core_Platform.get_hscrollHeight();
+				}
+				if(contents.get_componentHeight() > size.height) {
+					size.width -= haxe_ui_core_Platform.get_vscrollWidth();
+				}
 			}
 		}
+		size.width += 1;
+		var borderSize = this.get_borderSize();
+		size.width -= borderSize * 2;
+		size.height -= borderSize * 2;
+		return size;
 	}
-	,calcColumnWidths: function(usableSize,includePercentage) {
-		var columnWidths = [];
-		var _g = 0;
-		var _g1 = this._columns;
-		while(_g < _g1) {
-			var _ = _g++;
-			columnWidths.push(0);
+	,calcAutoSize: function(exclusions) {
+		var hscroll = this.get_component().findComponent(null,haxe_ui_components_HorizontalScroll,false);
+		var vscroll = this.get_component().findComponent(null,haxe_ui_components_VerticalScroll,false);
+		var size = haxe_ui_layouts_DefaultLayout.prototype.calcAutoSize.call(this,[hscroll,vscroll]);
+		if(hscroll != null && hscroll.get_hidden() == false) {
+			size.height += hscroll.get_componentHeight();
 		}
-		var rowIndex = 0;
-		var columnIndex = 0;
-		var _g = 0;
-		var _this = this.get_component();
-		var _g1 = _this._children == null ? [] : _this._children;
-		while(_g < _g1.length) {
-			var child = _g1[_g];
-			++_g;
-			if(child.get_includeInLayout() == false) {
-				continue;
-			}
-			if(child.get_percentWidth() == null) {
-				if(child.get_componentWidth() > columnWidths[columnIndex]) {
-					columnWidths[columnIndex] = child.get_componentWidth();
-				}
-			}
-			++columnIndex;
-			if(columnIndex >= this._columns) {
-				columnIndex = 0;
-				++rowIndex;
-			}
+		if(vscroll != null && vscroll.get_hidden() == false) {
+			size.width += vscroll.get_componentWidth();
 		}
-		if(includePercentage) {
-			rowIndex = 0;
-			columnIndex = 0;
-			var fullWidthsCounts = [0];
-			var _g = 0;
-			var _this = this.get_component();
-			var _g1 = _this._children == null ? [] : _this._children;
-			while(_g < _g1.length) {
-				var child = _g1[_g];
-				++_g;
-				if(child.get_includeInLayout() == false) {
-					continue;
+		if((js_Boot.__cast(this.get_component() , haxe_ui_containers_ScrollView)).get_native() == true || this._component.get_isNativeScroller() == true) {
+			var contents = this.get_component().findComponent("scrollview-contents",null,false,"css");
+			if(contents != null) {
+				if(contents.get_width() > this.get_component().get_width()) {
+					size.height += haxe_ui_core_Platform.get_hscrollHeight();
 				}
-				if(child.get_percentWidth() != null && child.get_percentWidth() == 100) {
-					fullWidthsCounts[rowIndex]++;
-				}
-				++columnIndex;
-				if(columnIndex >= this._columns) {
-					columnIndex = 0;
-					++rowIndex;
-					fullWidthsCounts.push(0);
-				}
-			}
-			rowIndex = 0;
-			columnIndex = 0;
-			var _g = 0;
-			var _this = this.get_component();
-			var _g1 = _this._children == null ? [] : _this._children;
-			while(_g < _g1.length) {
-				var child = _g1[_g];
-				++_g;
-				if(child.get_includeInLayout() == false) {
-					continue;
-				}
-				if(child.get_percentWidth() != null) {
-					var childPercentWidth = child.get_percentWidth();
-					if(childPercentWidth == 100 && fullWidthsCounts[rowIndex] != 0) {
-						var f = fullWidthsCounts[rowIndex];
-						if(rowIndex > 0 && fullWidthsCounts[rowIndex - 1] != 0) {
-							f = fullWidthsCounts[rowIndex - 1];
-						}
-						childPercentWidth = 100 / f;
-					}
-					var cx = usableSize.width * childPercentWidth / 100;
-					if(cx > columnWidths[columnIndex]) {
-						columnWidths[columnIndex] = cx;
-					}
-				}
-				++columnIndex;
-				if(columnIndex >= this._columns) {
-					columnIndex = 0;
-					++rowIndex;
+				if(contents.get_height() > this.get_component().get_height()) {
+					size.width += haxe_ui_core_Platform.get_vscrollWidth();
 				}
 			}
 		}
-		return columnWidths;
+		return size;
 	}
-	,calcRowHeights: function(usableSize,includePercentage) {
-		var _this = this.get_component();
-		var visibleChildren = (_this._children == null ? [] : _this._children).length;
-		var _g = 0;
-		var _this = this.get_component();
-		var _g1 = _this._children == null ? [] : _this._children;
-		while(_g < _g1.length) {
-			var child = _g1[_g];
-			++_g;
-			if(child.get_includeInLayout() == false) {
-				--visibleChildren;
-			}
-		}
-		var rowCount = visibleChildren / this._columns | 0;
-		if(visibleChildren % this._columns != 0) {
-			++rowCount;
-		}
-		var rowHeights = [];
-		var _g = 0;
-		var _g1 = rowCount;
-		while(_g < _g1) {
-			var _ = _g++;
-			rowHeights.push(0);
-		}
-		var rowIndex = 0;
-		var columnIndex = 0;
-		var _g = 0;
-		var _this = this.get_component();
-		var _g1 = _this._children == null ? [] : _this._children;
-		while(_g < _g1.length) {
-			var child = _g1[_g];
-			++_g;
-			if(child.get_includeInLayout() == false) {
-				continue;
-			}
-			if(child.get_percentHeight() == null) {
-				if(child.get_height() > rowHeights[rowIndex]) {
-					rowHeights[rowIndex] = child.get_height();
-				}
-			}
-			++columnIndex;
-			if(columnIndex >= this._columns) {
-				columnIndex = 0;
-				++rowIndex;
-			}
-		}
-		if(includePercentage) {
-			rowIndex = 0;
-			columnIndex = 0;
-			var newRow = true;
-			var fullHeightRowCount = 0;
-			var _g = 0;
-			var _this = this.get_component();
-			var _g1 = _this._children == null ? [] : _this._children;
-			while(_g < _g1.length) {
-				var child = _g1[_g];
-				++_g;
-				if(child.get_includeInLayout() == false) {
-					continue;
-				}
-				if(child.get_percentHeight() != null && child.get_percentHeight() == 100) {
-					if(newRow == true) {
-						newRow = false;
-						++fullHeightRowCount;
-					}
-				}
-				++columnIndex;
-				if(columnIndex >= this._columns) {
-					columnIndex = 0;
-					++rowIndex;
-					newRow = true;
-				}
-			}
-			rowIndex = 0;
-			columnIndex = 0;
-			var _g = 0;
-			var _this = this.get_component();
-			var _g1 = _this._children == null ? [] : _this._children;
-			while(_g < _g1.length) {
-				var child = _g1[_g];
-				++_g;
-				if(child.get_includeInLayout() == false) {
-					continue;
-				}
-				if(child.get_percentHeight() != null) {
-					var childPercentHeight = child.get_percentHeight();
-					if(childPercentHeight == 100 && fullHeightRowCount > 1) {
-						childPercentHeight = 100 / fullHeightRowCount;
-					}
-					var cy = usableSize.height * childPercentHeight / 100;
-					if(cy > rowHeights[rowIndex]) {
-						rowHeights[rowIndex] = cy;
-					} else {
-						var tmp = usableSize.height > rowHeights[rowIndex];
-					}
-				}
-				++columnIndex;
-				if(columnIndex >= this._columns) {
-					columnIndex = 0;
-					++rowIndex;
-				}
-			}
-		}
-		return rowHeights;
-	}
-	,calcExplicitWidths: function() {
-		var explicitWidths = [];
-		var _g = 0;
-		var _g1 = this._columns;
-		while(_g < _g1) {
-			var _ = _g++;
-			explicitWidths.push(false);
-		}
-		var rowIndex = 0;
-		var columnIndex = 0;
-		var _g = 0;
-		var _this = this.get_component();
-		var _g1 = _this._children == null ? [] : _this._children;
-		while(_g < _g1.length) {
-			var child = _g1[_g];
-			++_g;
-			if(child.get_includeInLayout() == false) {
-				continue;
-			}
-			if(child.get_percentWidth() == null && child.get_componentWidth() > 0) {
-				explicitWidths[columnIndex] = true;
-			}
-			++columnIndex;
-			if(columnIndex >= this._columns) {
-				columnIndex = 0;
-				++rowIndex;
-			}
-		}
-		return explicitWidths;
-	}
-	,calcExplicitHeights: function() {
-		var _this = this.get_component();
-		var visibleChildren = (_this._children == null ? [] : _this._children).length;
-		var _g = 0;
-		var _this = this.get_component();
-		var _g1 = _this._children == null ? [] : _this._children;
-		while(_g < _g1.length) {
-			var child = _g1[_g];
-			++_g;
-			if(child.get_includeInLayout() == false) {
-				--visibleChildren;
-			}
-		}
-		var rowCount = visibleChildren / this.get_columns() | 0;
-		if(visibleChildren % this._columns != 0) {
-			++rowCount;
-		}
-		var explicitHeights = [];
-		var _g = 0;
-		var _g1 = rowCount;
-		while(_g < _g1) {
-			var _ = _g++;
-			explicitHeights.push(false);
-		}
-		var rowIndex = 0;
-		var columnIndex = 0;
-		var _g = 0;
-		var _this = this.get_component();
-		var _g1 = _this._children == null ? [] : _this._children;
-		while(_g < _g1.length) {
-			var child = _g1[_g];
-			++_g;
-			if(child.get_includeInLayout() == false) {
-				continue;
-			}
-			if(child.get_percentHeight() == null && child.get_componentHeight() > 0) {
-				explicitHeights[columnIndex % this._columns] = true;
-			}
-			++columnIndex;
-			if(columnIndex >= this._columns) {
-				columnIndex = 0;
-				++rowIndex;
-			}
-		}
-		return explicitHeights;
-	}
-	,__class__: haxe_ui_layouts_VerticalGridLayout
-	,__properties__: $extend(haxe_ui_layouts_Layout.prototype.__properties__,{set_columns:"set_columns",get_columns:"get_columns"})
+	,__class__: haxe_ui_layouts_ScrollViewLayout
 });
 var haxe_ui_layouts_VerticalLayout = function() {
 	haxe_ui_layouts_DefaultLayout.call(this);
@@ -14103,6 +21563,471 @@ haxe_ui_layouts_VerticalLayout.prototype = $extend(haxe_ui_layouts_DefaultLayout
 		return size;
 	}
 	,__class__: haxe_ui_layouts_VerticalLayout
+});
+var haxe_ui_layouts_VirtualLayout = function() {
+	this._lastItemRenderer = null;
+	this._sizeCache = [];
+	this._rendererPool = [];
+	this._lastIndex = -1;
+	this._firstIndex = -1;
+	haxe_ui_layouts_ScrollViewLayout.call(this);
+};
+$hxClasses["haxe.ui.layouts.VirtualLayout"] = haxe_ui_layouts_VirtualLayout;
+haxe_ui_layouts_VirtualLayout.__name__ = "haxe.ui.layouts.VirtualLayout";
+haxe_ui_layouts_VirtualLayout.__super__ = haxe_ui_layouts_ScrollViewLayout;
+haxe_ui_layouts_VirtualLayout.prototype = $extend(haxe_ui_layouts_ScrollViewLayout.prototype,{
+	_firstIndex: null
+	,_lastIndex: null
+	,_rendererPool: null
+	,_sizeCache: null
+	,contents: null
+	,get_contents: function() {
+		if(this.contents == null) {
+			this.contents = this.findComponent("scrollview-contents",null,false,"css");
+		}
+		return this.contents;
+	}
+	,get_dataSource: function() {
+		return (js_Boot.__cast(this._component , haxe_ui_core_IDataComponent)).get_dataSource();
+	}
+	,itemWidth: null
+	,get_itemWidth: function() {
+		var comp = js_Boot.__cast(this._component , haxe_ui_containers_IVirtualContainer);
+		if(comp.get_itemWidth() > 0) {
+			return comp.get_itemWidth();
+		}
+		var _this = this.get_contents();
+		var childComponents = _this._children == null ? [] : _this._children;
+		var result = 0;
+		if(childComponents.length > 0) {
+			result = childComponents[0].get_width();
+			if(result <= 0) {
+				childComponents[0].syncComponentValidation();
+				result = childComponents[0].get_width();
+			}
+		}
+		if(result > 0) {
+			comp.set_itemWidth(result);
+		} else {
+			result = 1;
+		}
+		return result;
+	}
+	,itemHeight: null
+	,get_itemHeight: function() {
+		var comp = js_Boot.__cast(this._component , haxe_ui_containers_IVirtualContainer);
+		if(comp.get_itemHeight() > 0) {
+			return comp.get_itemHeight();
+		}
+		var _this = this.get_contents();
+		var childComponents = _this._children == null ? [] : _this._children;
+		var result = 0;
+		if(childComponents.length > 0) {
+			result = childComponents[0].get_height();
+			if(result <= 0) {
+				childComponents[0].syncComponentValidation();
+				result = childComponents[0].get_height();
+			}
+		}
+		if(result <= 0) {
+			result = 25;
+		}
+		return result;
+	}
+	,itemCount: null
+	,get_itemCount: function() {
+		var comp = js_Boot.__cast(this._component , haxe_ui_containers_IVirtualContainer);
+		if(comp.get_itemCount() >= 0) {
+			return comp.get_itemCount();
+		} else {
+			return 0;
+		}
+	}
+	,refresh: function() {
+		this.refreshData();
+		haxe_ui_layouts_ScrollViewLayout.prototype.refresh.call(this);
+	}
+	,refreshData: function() {
+		if(this.get_dataSource() == null) {
+			return;
+		}
+		var comp = js_Boot.__cast(this._component , haxe_ui_containers_IVirtualContainer);
+		if(comp.get_virtual() == false) {
+			this.refreshNonVirtualData();
+		} else {
+			this.refreshVirtualData();
+		}
+	}
+	,_lastItemRenderer: null
+	,refreshNonVirtualData: function() {
+		var comp = js_Boot.__cast(this._component , haxe_ui_containers_IVirtualContainer);
+		if(comp.get_itemRenderer() != this._lastItemRenderer) {
+			this._lastItemRenderer = comp.get_itemRenderer();
+			this.get_contents().removeAllComponents();
+		}
+		var dataSource = this.get_dataSource();
+		var contents = this.get_contents();
+		var _g = 0;
+		var _g1 = dataSource.get_size();
+		while(_g < _g1) {
+			var n = _g++;
+			var data = dataSource.get(n);
+			var item = null;
+			if(n < (contents._children == null ? [] : contents._children).length) {
+				item = js_Boot.__cast((contents._children == null ? [] : contents._children)[n] , haxe_ui_core_ItemRenderer);
+				if(item.get_data() == data) {
+					item.invalidateComponent("data",false);
+					continue;
+				}
+				var cls = this.itemClass(n,data);
+				if(!js_Boot.__instanceof(item,cls)) {
+					this.removeRenderer(item);
+					item = this.getRenderer(cls,n);
+					contents.addComponentAt(item,n);
+				}
+			} else {
+				var cls1 = this.itemClass(n,data);
+				item = this.getRenderer(cls1,n);
+				contents.addComponent(item);
+			}
+			var className = n % 2 == 0 ? "even" : "odd";
+			if(item.classes.indexOf(className) == -1) {
+				var inverseClassName = n % 2 == 0 ? "odd" : "even";
+				item.removeClass(inverseClassName);
+				item.addClass(className);
+			}
+			item.itemIndex = n;
+			item.set_data(data);
+		}
+		while(dataSource.get_size() < (contents._children == null ? [] : contents._children).length) {
+			var item = js_Boot.__cast((contents._children == null ? [] : contents._children)[(contents._children == null ? [] : contents._children).length - 1] , haxe_ui_core_ItemRenderer);
+			this.removeRenderer(item);
+		}
+	}
+	,refreshVirtualData: function() {
+		var comp = js_Boot.__cast(this._component , haxe_ui_containers_IVirtualContainer);
+		if(comp.get_itemRenderer() != this._lastItemRenderer) {
+			this._lastItemRenderer = comp.get_itemRenderer();
+			this.get_contents().removeAllComponents();
+			this._rendererPool = [];
+		}
+		this.removeInvisibleRenderers();
+		this.calculateRangeVisible();
+		this.updateScroll();
+		var dataSource = this.get_dataSource();
+		var i = 0;
+		var _g = this._firstIndex;
+		var _g1 = this._lastIndex;
+		while(_g < _g1) {
+			var n = _g++;
+			var data = dataSource.get(n);
+			var item = null;
+			var cls = this.itemClass(n,data);
+			var _this = this.get_contents();
+			if((_this._children == null ? [] : _this._children).length <= i) {
+				item = this.getRenderer(cls,n);
+				this.get_contents().addComponent(item);
+			} else {
+				var _this1 = this.get_contents();
+				item = js_Boot.__cast((_this1._children == null ? [] : _this1._children)[i] , haxe_ui_core_ItemRenderer);
+				if(!js_Boot.__instanceof(item,cls)) {
+					item = this.getRenderer(cls,n);
+					this.get_contents().addComponentAt(item,i);
+				} else if(item.itemIndex != n) {
+					if(this._component.hasEvent("rendererDestroyed")) {
+						this._component.dispatch(new haxe_ui_events_UIEvent("rendererDestroyed",null,item));
+					}
+					this._component.setComponentIndex(item,i);
+					item.itemIndex = n;
+					if(this._component.hasEvent("rendererCreated")) {
+						this._component.dispatch(new haxe_ui_events_UIEvent("rendererCreated",null,item));
+					}
+				}
+			}
+			var className = n % 2 == 0 ? "even" : "odd";
+			if(item.classes.indexOf(className) == -1) {
+				var inverseClassName = n % 2 == 0 ? "odd" : "even";
+				item.removeClass(inverseClassName);
+				item.addClass(className);
+			}
+			item.set_data(data);
+			++i;
+		}
+		while(true) {
+			var _this = this.get_contents();
+			if(!((_this._children == null ? [] : _this._children).length > i)) {
+				break;
+			}
+			var _this1 = this.get_contents();
+			var tmp = _this1._children == null ? [] : _this1._children;
+			var _this2 = this.get_contents();
+			this.removeRenderer(js_Boot.__cast(tmp[(_this2._children == null ? [] : _this2._children).length - 1] , haxe_ui_core_ItemRenderer),false);
+		}
+	}
+	,calculateRangeVisible: function() {
+	}
+	,updateScroll: function() {
+	}
+	,itemClass: function(index,data) {
+		var comp = js_Boot.__cast(this._component , haxe_ui_containers_IVirtualContainer);
+		if(comp.get_itemRendererClass() != null) {
+			return comp.get_itemRendererClass();
+		} else if(comp.get_itemRenderer() != null) {
+			return js_Boot.getClass(comp.get_itemRenderer());
+		} else {
+			return haxe_ui_core_BasicItemRenderer;
+		}
+	}
+	,getRenderer: function(cls,index) {
+		var instance = null;
+		var comp = js_Boot.__cast(this._component , haxe_ui_containers_IVirtualContainer);
+		if(comp.get_virtual() == true) {
+			var _g = 0;
+			var _g1 = this._rendererPool.length;
+			while(_g < _g1) {
+				var i = _g++;
+				var renderer = this._rendererPool[i];
+				if(js_Boot.__instanceof(renderer,cls)) {
+					this._rendererPool.splice(i,1);
+					instance = renderer;
+					break;
+				}
+			}
+		}
+		if(instance == null) {
+			if(comp.get_itemRenderer() != null && js_Boot.getClass(comp.get_itemRenderer()) == cls) {
+				instance = comp.get_itemRenderer().cloneComponent();
+				instance.handleVisibility(true);
+			} else {
+				instance = Type.createInstance(cls,[]);
+			}
+		}
+		instance.itemIndex = index;
+		if(this._component.hasEvent("rendererCreated")) {
+			this._component.dispatch(new haxe_ui_events_UIEvent("rendererCreated",null,instance));
+		}
+		if(this._component.get_hidden() == false) {
+			instance.handleVisibility(true);
+		}
+		return js_Boot.__cast(instance , haxe_ui_core_ItemRenderer);
+	}
+	,removeRenderer: function(renderer,dispose) {
+		if(dispose == null) {
+			dispose = true;
+		}
+		this._component.removeComponent(renderer,dispose);
+		var comp = js_Boot.__cast(this._component , haxe_ui_containers_IVirtualContainer);
+		if(comp.get_virtual() == true) {
+			this._rendererPool.push(js_Boot.__cast(renderer , haxe_ui_core_ItemRenderer));
+		}
+		if(this._component.hasEvent("rendererDestroyed")) {
+			this._component.dispatch(new haxe_ui_events_UIEvent("rendererDestroyed",null,renderer));
+		}
+		renderer.itemIndex = -1;
+	}
+	,removeInvisibleRenderers: function() {
+		var contents = this.get_contents();
+		if(this._firstIndex >= 0) {
+			while((contents._children == null ? [] : contents._children).length > 0 && !this.isRendererVisible((contents._children == null ? [] : contents._children)[0])) {
+				this.removeRenderer(js_Boot.__cast((contents._children == null ? [] : contents._children)[0] , haxe_ui_core_ItemRenderer),false);
+				++this._firstIndex;
+			}
+		}
+		if(this._lastIndex >= 0) {
+			while((contents._children == null ? [] : contents._children).length > 0 && !this.isRendererVisible((contents._children == null ? [] : contents._children)[(contents._children == null ? [] : contents._children).length - 1])) {
+				this.removeRenderer(js_Boot.__cast((contents._children == null ? [] : contents._children)[(contents._children == null ? [] : contents._children).length - 1] , haxe_ui_core_ItemRenderer),false);
+				--this._lastIndex;
+			}
+		}
+	}
+	,isRendererVisible: function(renderer) {
+		if(renderer == null) {
+			return false;
+		}
+		if(renderer.get_top() < this._component.get_componentHeight() && renderer.get_top() + renderer.get_componentHeight() >= 0 && renderer.get_left() < this._component.get_componentWidth()) {
+			return renderer.get_left() + renderer.get_componentWidth() >= 0;
+		} else {
+			return false;
+		}
+	}
+	,isIndexVisible: function(index) {
+		if(index >= this._firstIndex) {
+			return index <= this._lastIndex;
+		} else {
+			return false;
+		}
+	}
+	,__class__: haxe_ui_layouts_VirtualLayout
+	,__properties__: $extend(haxe_ui_layouts_ScrollViewLayout.prototype.__properties__,{get_itemCount:"get_itemCount",get_itemHeight:"get_itemHeight",get_itemWidth:"get_itemWidth",get_dataSource:"get_dataSource",get_contents:"get_contents"})
+});
+var haxe_ui_layouts_VerticalVirtualLayout = function() {
+	haxe_ui_layouts_VirtualLayout.call(this);
+};
+$hxClasses["haxe.ui.layouts.VerticalVirtualLayout"] = haxe_ui_layouts_VerticalVirtualLayout;
+haxe_ui_layouts_VerticalVirtualLayout.__name__ = "haxe.ui.layouts.VerticalVirtualLayout";
+haxe_ui_layouts_VerticalVirtualLayout.__super__ = haxe_ui_layouts_VirtualLayout;
+haxe_ui_layouts_VerticalVirtualLayout.prototype = $extend(haxe_ui_layouts_VirtualLayout.prototype,{
+	repositionChildren: function() {
+		haxe_ui_layouts_VirtualLayout.prototype.repositionChildren.call(this);
+		var comp = js_Boot.__cast(this._component , haxe_ui_containers_IVirtualContainer);
+		var itemHeight = this.get_itemHeight();
+		var contents = this.get_contents();
+		var verticalSpacing = contents.get_layout().get_verticalSpacing();
+		if(comp.get_virtual() == true) {
+			var n = this._firstIndex;
+			if(comp.get_variableItemSize() == true) {
+				var pos = -comp.get_vscrollPos();
+				var _g = 0;
+				var _g1 = this._lastIndex;
+				while(_g < _g1) {
+					var i = _g++;
+					if(i >= this._firstIndex) {
+						var c = contents.getComponentAt(i - this._firstIndex);
+						c.set_top(pos);
+					}
+					var size = this._sizeCache[i];
+					pos += (size != null && size != 0 ? size : itemHeight) + verticalSpacing;
+				}
+			} else {
+				var _g = 0;
+				var _g1 = contents._children == null ? [] : contents._children;
+				while(_g < _g1.length) {
+					var child = _g1[_g];
+					++_g;
+					child.set_top(n * (itemHeight + verticalSpacing) - comp.get_vscrollPos());
+					++n;
+				}
+			}
+		}
+	}
+	,verticalConstraintModifier: function() {
+		return 0;
+	}
+	,calculateRangeVisible: function() {
+		var comp = js_Boot.__cast(this._component , haxe_ui_containers_IVirtualContainer);
+		var verticalSpacing = this.get_contents().get_layout().get_verticalSpacing();
+		var itemHeight = this.get_itemHeight();
+		var visibleItemsCount = 0;
+		var contentsHeight = 0;
+		if(this.get_contents().get_autoHeight() == true) {
+			var itemCount = this.get_itemCount();
+			if(itemCount > 0 || this._component.get_autoHeight() == true) {
+				contentsHeight = itemCount * itemHeight - this.verticalConstraintModifier();
+			} else {
+				contentsHeight = this._component.get_height() - this.verticalConstraintModifier();
+			}
+		} else {
+			contentsHeight = this.get_contents().get_height() - this.verticalConstraintModifier();
+		}
+		if(contentsHeight > this._component.get_height() - this.verticalConstraintModifier()) {
+			contentsHeight = this._component.get_height() - this.verticalConstraintModifier();
+		}
+		if(comp.get_variableItemSize() == true) {
+			var totalSize = 0;
+			var requireInvalidation = false;
+			var newFirstIndex = -1;
+			var _g = 0;
+			var _g1 = this.get_dataSource().get_size();
+			while(_g < _g1) {
+				var i = _g++;
+				var size = this._sizeCache[i];
+				if(size == null || size == 0) {
+					if(i >= this._firstIndex && i <= this._lastIndex) {
+						var c = this.get_contents().getComponentAt(i - this._firstIndex);
+						if(c != null && c.get_componentHeight() > 0) {
+							this._sizeCache[i] = c.get_componentHeight();
+							size = c.get_componentHeight();
+						} else {
+							requireInvalidation = true;
+							size = itemHeight;
+						}
+					} else {
+						requireInvalidation = true;
+						size = itemHeight;
+					}
+				}
+				size += verticalSpacing;
+				if(newFirstIndex == -1) {
+					if(totalSize + size > comp.get_vscrollPos()) {
+						newFirstIndex = i;
+						totalSize += size - comp.get_vscrollPos();
+						++visibleItemsCount;
+					} else {
+						totalSize += size;
+					}
+				} else if(totalSize + size > contentsHeight) {
+					break;
+				} else {
+					++visibleItemsCount;
+					totalSize += size;
+				}
+			}
+			if(requireInvalidation == true) {
+				var _this = this._component;
+				if(!(_this._layout == null || _this._layoutLocked == true)) {
+					_this.invalidateComponent("layout",false);
+				}
+			}
+			this._firstIndex = newFirstIndex;
+		} else {
+			visibleItemsCount = Math.ceil(contentsHeight / (itemHeight + verticalSpacing));
+			this._firstIndex = comp.get_vscrollPos() / (itemHeight + verticalSpacing) | 0;
+		}
+		if(this._firstIndex < 0) {
+			this._firstIndex = 0;
+		}
+		var rc = new haxe_ui_geom_Rectangle(0,0,this.get_contents().get_width(),contentsHeight - (this.get_paddingTop() + this.get_paddingBottom()));
+		this.get_contents().set_componentClipRect(rc);
+		this._lastIndex = this._firstIndex + visibleItemsCount + 1;
+		if(this._lastIndex > this.get_dataSource().get_size()) {
+			this._lastIndex = this.get_dataSource().get_size();
+		}
+	}
+	,updateScroll: function() {
+		var comp = js_Boot.__cast(this._component , haxe_ui_containers_IVirtualContainer);
+		var usableSize = this.get_usableSize();
+		var dataSize = this.get_dataSource().get_size();
+		var verticalSpacing = this.get_contents().get_layout().get_verticalSpacing();
+		var scrollMax = 0;
+		var itemHeight = this.get_itemHeight();
+		if(comp.get_variableItemSize() == true) {
+			scrollMax = -usableSize.height;
+			var _g = 0;
+			var _g1 = this.get_dataSource().get_size();
+			while(_g < _g1) {
+				var i = _g++;
+				var size = this._sizeCache[i];
+				if(size == null || size == 0) {
+					size = itemHeight;
+				}
+				scrollMax += size + verticalSpacing + this.verticalConstraintModifier();
+			}
+		} else {
+			scrollMax = dataSize * itemHeight + (dataSize - 1) * verticalSpacing - usableSize.height + this.verticalConstraintModifier();
+		}
+		if(scrollMax < 0) {
+			scrollMax = 0;
+		}
+		comp.set_vscrollMax(scrollMax);
+		comp.set_vscrollPageSize(usableSize.height / (scrollMax + usableSize.height) * scrollMax);
+	}
+	,calcAutoSize: function(exclusions) {
+		var size = haxe_ui_layouts_VirtualLayout.prototype.calcAutoSize.call(this,exclusions);
+		var comp = js_Boot.__cast(this._component , haxe_ui_containers_IVirtualContainer);
+		if(comp.get_itemCount() > 0 && this._component.get_autoHeight() == true) {
+			var contents = this._component.findComponent("scrollview-contents",null,false);
+			var contentsPadding = 0;
+			if(contents != null) {
+				var layout = contents.get_layout();
+				if(layout != null) {
+					contentsPadding = layout.get_paddingTop() + layout.get_paddingBottom();
+				}
+			}
+			size.height = this.get_itemHeight() * comp.get_itemCount() + this.get_paddingTop() + this.get_paddingBottom() + contentsPadding;
+		}
+		return size;
+	}
+	,__class__: haxe_ui_layouts_VerticalVirtualLayout
 });
 var haxe_ui_locale_LocaleEvent = function(type) {
 	haxe_ui_events_UIEvent.call(this,type);
@@ -14389,6 +22314,9 @@ haxe_ui_locale_LocaleManager.prototype = {
 var haxe_ui_macros_BackendMacros = function() { };
 $hxClasses["haxe.ui.macros.BackendMacros"] = haxe_ui_macros_BackendMacros;
 haxe_ui_macros_BackendMacros.__name__ = "haxe.ui.macros.BackendMacros";
+var haxe_ui_macros_ComponentMacros = function() { };
+$hxClasses["haxe.ui.macros.ComponentMacros"] = haxe_ui_macros_ComponentMacros;
+haxe_ui_macros_ComponentMacros.__name__ = "haxe.ui.macros.ComponentMacros";
 var haxe_ui_macros_ModuleMacros = function() { };
 $hxClasses["haxe.ui.macros.ModuleMacros"] = haxe_ui_macros_ModuleMacros;
 haxe_ui_macros_ModuleMacros.__name__ = "haxe.ui.macros.ModuleMacros";
@@ -20239,6 +28167,10 @@ haxe_ui_core_ComponentBounds.__meta__ = { fields : { percentWidth : { clonable :
 haxe_ui_backend_ComponentImpl.elementToComponent = new haxe_ds_ObjectMap();
 haxe_ui_backend_ComponentImpl._stylesAdded = false;
 haxe_ui_core_Component.__meta__ = { fields : { styleNames : { clonable : null}, styleString : { clonable : null}}};
+DateTools.DAY_SHORT_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+DateTools.DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+DateTools.MONTH_SHORT_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+DateTools.MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 haxe_crypto_Base64.CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 haxe_crypto_Base64.BYTES = haxe_io_Bytes.ofString(haxe_crypto_Base64.CHARS);
 haxe_ui_backend_BackendImpl.id = "html5";
@@ -20320,11 +28252,6 @@ haxe_ui_backend_html5_EventMapper.TOUCH_TO_MOUSE = (function($this) {
 haxe_ui_backend_html5_HtmlUtils._dpi = 0;
 haxe_ui_backend_html5_util_FontDetect._initialized = false;
 haxe_ui_backend_html5_util_FontDetect._aFallbackFonts = ["serif","sans-serif","monospace","cursive","fantasy"];
-haxe_ui_core_ItemRenderer.__meta__ = { fields : { allowHover : { clonable : null}}};
-haxe_ui_core_Platform.METRIC_VSCROLL_WIDTH = "patform.metrics.vscroll.width";
-haxe_ui_core_Platform.METRIC_HSCROLL_HEIGHT = "patform.metrics.hscroll.height";
-haxe_ui_data_DataSource.regexAlpha = new EReg("[^a-zA-Z]","g");
-haxe_ui_data_DataSource.regexNumeric = new EReg("[^0-9]","g");
 haxe_ui_events_UIEvent.READY = "ready";
 haxe_ui_events_UIEvent.DESTROY = "destroy";
 haxe_ui_events_UIEvent.RESIZE = "resize";
@@ -20345,6 +28272,31 @@ haxe_ui_events_UIEvent.COMPONENT_ADDED = "componentAdded";
 haxe_ui_events_UIEvent.COMPONENT_REMOVED = "componentRemoved";
 haxe_ui_events_UIEvent.DRAG_START = "dragStart";
 haxe_ui_events_UIEvent.DRAG_END = "dragEnd";
+haxe_ui_components_CalendarEvent.DATE_CHANGE = "datechange";
+haxe_ui_components_CalendarDropDownHandler.DATE_FORMAT = "%d/%m/%Y";
+haxe_ui_components_DropDownBuilder.HANDLER_MAP = new haxe_ds_StringMap();
+haxe_ui_components__$TabBar_Builder.SCROLL_INCREMENT = 20;
+haxe_ui_containers_CalendarView.MONTH_NAMES = ["January","Febuary","March","April","May","June","July","August","September","October","November","December"];
+haxe_ui_containers_CalendarView.DATE_FORMAT = "%Y-%m-%d";
+haxe_ui_containers_ScrollViewEvents.INERTIAL_TIME_CONSTANT = 325;
+haxe_ui_containers_dialogs_DialogButton.SAVE = "{{dialog.save}}";
+haxe_ui_containers_dialogs_DialogButton.YES = "{{dialog.yes}}";
+haxe_ui_containers_dialogs_DialogButton.NO = "{{dialog.no}}";
+haxe_ui_containers_dialogs_DialogButton.CLOSE = "{{dialog.close}}";
+haxe_ui_containers_dialogs_DialogButton.OK = "{{dialog.ok}}";
+haxe_ui_containers_dialogs_DialogButton.CANCEL = "{{dialog.cancel}}";
+haxe_ui_containers_dialogs_DialogButton.APPLY = "{{dialog.apply}}";
+haxe_ui_containers_dialogs_DialogEvent.DIALOG_CLOSED = "dialogClosed";
+haxe_ui_containers_dialogs_MessageBoxType.TYPE_INFO = "info";
+haxe_ui_containers_dialogs_MessageBoxType.TYPE_QUESTION = "question";
+haxe_ui_containers_dialogs_MessageBoxType.TYPE_WARNING = "warning";
+haxe_ui_containers_dialogs_MessageBoxType.TYPE_ERROR = "error";
+haxe_ui_containers_dialogs_MessageBoxType.TYPE_YESNO = "yesno";
+haxe_ui_core_ItemRenderer.__meta__ = { fields : { allowHover : { clonable : null}}};
+haxe_ui_core_Platform.METRIC_VSCROLL_WIDTH = "patform.metrics.vscroll.width";
+haxe_ui_core_Platform.METRIC_HSCROLL_HEIGHT = "patform.metrics.hscroll.height";
+haxe_ui_data_DataSource.regexAlpha = new EReg("[^a-zA-Z]","g");
+haxe_ui_data_DataSource.regexNumeric = new EReg("[^0-9]","g");
 haxe_ui_events_AnimationEvent.START = "animationstart";
 haxe_ui_events_AnimationEvent.END = "animationend";
 haxe_ui_events_FocusEvent.FOCUS_IN = "focusin";
