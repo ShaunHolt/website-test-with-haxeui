@@ -4724,7 +4724,7 @@ var CustomDialog = function() {
 	this.addComponent(c0);
 	this.set_height(400.);
 	this.bindingRoot = true;
-	this.set_title("Robot Controller");
+	this.set_title("Custom Dialog");
 	this.modal = false;
 	var larr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.apply}}").split("|");
 	var rarr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.cancel}}").split("|");
@@ -5029,16 +5029,19 @@ Main.main = function() {
 		c2.set_top(110.);
 		c2.set_percentWidth(100.);
 		var c3 = new haxe_ui_components_Button();
+		c3.set_id("customNonModalDialogButtonVideos");
 		c3.set_text("Videos");
 		c3.set_styleNames("styled-button");
 		c3.set_styleString("background-opacity: .1");
 		c2.addComponent(c3);
 		var c4 = new haxe_ui_components_Button();
+		c4.set_id("customNonModalDialogButtonSocial");
 		c4.set_text("Social");
 		c4.set_styleNames("styled-button");
 		c4.set_styleString("background-opacity: .1");
 		c2.addComponent(c4);
 		var c5 = new haxe_ui_components_Button();
+		c5.set_id("customNonModalDialogButtonSensors");
 		c5.set_text("Sensors");
 		c5.set_styleNames("styled-button");
 		c5.set_styleString("background-opacity: .1");
@@ -5050,21 +5053,25 @@ Main.main = function() {
 		c6.set_styleString("background-opacity: .1");
 		c2.addComponent(c6);
 		var c7 = new haxe_ui_components_Button();
+		c7.set_id("customNonModalDialogButtonToolbox");
 		c7.set_text("Toolbox");
 		c7.set_styleNames("styled-button");
 		c7.set_styleString("background-opacity: .1");
 		c2.addComponent(c7);
 		var c8 = new haxe_ui_components_Button();
+		c8.set_id("customNonModalDialogButtonGuides");
 		c8.set_text("Guides");
 		c8.set_styleNames("styled-button");
 		c8.set_styleString("background-opacity: .1");
 		c2.addComponent(c8);
 		var c9 = new haxe_ui_components_Button();
+		c9.set_id("customNonModalDialogButtonAbout");
 		c9.set_text("About");
 		c9.set_styleNames("styled-button");
 		c9.set_styleString("background-opacity: .1");
 		c2.addComponent(c9);
 		var c10 = new haxe_ui_components_Button();
+		c10.set_id("customNonModalDialogButtonHosting");
 		c10.set_text("Hosting");
 		c10.set_styleNames("styled-button");
 		c10.set_styleString("background-opacity: .1");
@@ -5105,9 +5112,9 @@ Main.main = function() {
 		var main = rootComponent;
 		var customNonModalDialogButtonRobotics = main.findComponent("customNonModalDialogButtonRobotics",haxe_ui_components_Button);
 		customNonModalDialogButtonRobotics.set_onClick(function(e) {
-			var dialog = new CustomDialog();
-			dialog.set_width(800);
-			dialog.show();
+			var dialogRobotics = new CustomDialog();
+			dialogRobotics.set_width(800);
+			dialogRobotics.show();
 		});
 		app.addComponent(new MainView());
 		app.start();
@@ -5160,16 +5167,19 @@ var MainView = function() {
 	c2.set_top(110.);
 	c2.set_percentWidth(100.);
 	var c3 = new haxe_ui_components_Button();
+	c3.set_id("customNonModalDialogButtonVideos");
 	c3.set_text("Videos");
 	c3.set_styleNames("styled-button");
 	c3.set_styleString("background-opacity: .1");
 	c2.addComponent(c3);
 	var c4 = new haxe_ui_components_Button();
+	c4.set_id("customNonModalDialogButtonSocial");
 	c4.set_text("Social");
 	c4.set_styleNames("styled-button");
 	c4.set_styleString("background-opacity: .1");
 	c2.addComponent(c4);
 	var c5 = new haxe_ui_components_Button();
+	c5.set_id("customNonModalDialogButtonSensors");
 	c5.set_text("Sensors");
 	c5.set_styleNames("styled-button");
 	c5.set_styleString("background-opacity: .1");
@@ -5181,21 +5191,25 @@ var MainView = function() {
 	c6.set_styleString("background-opacity: .1");
 	c2.addComponent(c6);
 	var c7 = new haxe_ui_components_Button();
+	c7.set_id("customNonModalDialogButtonToolbox");
 	c7.set_text("Toolbox");
 	c7.set_styleNames("styled-button");
 	c7.set_styleString("background-opacity: .1");
 	c2.addComponent(c7);
 	var c8 = new haxe_ui_components_Button();
+	c8.set_id("customNonModalDialogButtonGuides");
 	c8.set_text("Guides");
 	c8.set_styleNames("styled-button");
 	c8.set_styleString("background-opacity: .1");
 	c2.addComponent(c8);
 	var c9 = new haxe_ui_components_Button();
+	c9.set_id("customNonModalDialogButtonAbout");
 	c9.set_text("About");
 	c9.set_styleNames("styled-button");
 	c9.set_styleString("background-opacity: .1");
 	c2.addComponent(c9);
 	var c10 = new haxe_ui_components_Button();
+	c10.set_id("customNonModalDialogButtonHosting");
 	c10.set_text("Hosting");
 	c10.set_styleNames("styled-button");
 	c10.set_styleString("background-opacity: .1");
@@ -5233,7 +5247,14 @@ var MainView = function() {
 	c0.addComponent(c14);
 	this.addComponent(c0);
 	this.bindingRoot = true;
+	this.customNonModalDialogButtonVideos = c3;
+	this.customNonModalDialogButtonToolbox = c7;
+	this.customNonModalDialogButtonSocial = c4;
+	this.customNonModalDialogButtonSensors = c5;
 	this.customNonModalDialogButtonRobotics = c6;
+	this.customNonModalDialogButtonHosting = c10;
+	this.customNonModalDialogButtonGuides = c8;
+	this.customNonModalDialogButtonAbout = c9;
 	this.box1 = c0;
 };
 $hxClasses["MainView"] = MainView;
@@ -5259,7 +5280,14 @@ MainView.prototype = $extend(haxe_ui_containers_VBox.prototype,{
 	,self: function() {
 		return new MainView();
 	}
+	,customNonModalDialogButtonVideos: null
+	,customNonModalDialogButtonToolbox: null
+	,customNonModalDialogButtonSocial: null
+	,customNonModalDialogButtonSensors: null
 	,customNonModalDialogButtonRobotics: null
+	,customNonModalDialogButtonHosting: null
+	,customNonModalDialogButtonGuides: null
+	,customNonModalDialogButtonAbout: null
 	,box1: null
 	,__class__: MainView
 });

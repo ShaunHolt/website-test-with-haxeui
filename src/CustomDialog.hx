@@ -6,7 +6,7 @@ import haxe.ui.containers.dialogs.Dialog;
 class CustomDialog extends Dialog {
     public function new() {
         super();
-        title = "Robot Controller";
+        title = "Custom Dialog";
         modal = false;
         buttons =  DialogButton.APPLY | DialogButton.CANCEL;
     }

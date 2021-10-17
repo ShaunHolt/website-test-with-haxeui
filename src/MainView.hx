@@ -7,6 +7,7 @@ import haxe.ui.events.MouseEvent;
 class MainView extends VBox {
     public function new() {
 
+
         super();
     }
     

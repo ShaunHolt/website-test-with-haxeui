@@ -22,10 +22,14 @@ class Main {
         var customNonModalDialogButtonRobotics = main.findComponent("customNonModalDialogButtonRobotics", Button);
             customNonModalDialogButtonRobotics.onClick = function(e) {
 
-        var dialog = new CustomDialog();
-            dialog.width = 800;
-            dialog.show();
+        var dialogRobotics = new CustomDialog();
+            dialogRobotics.width = 800;
+            dialogRobotics.show();
             }
+
+
+
+
 
 
             app.addComponent(new MainView());
