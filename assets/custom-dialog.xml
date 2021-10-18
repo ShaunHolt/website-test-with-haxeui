@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<dialog height="400">
+<dialog height="300">
     <tabview width="100%" height="100%">
-        <hbox text="Notes" width="100%" height="100%">
+        <hbox text="Page 1" width="100%" height="100%">
             <listview width="200" height="100%">
                 <data>
                     <item text="Item 1" />
@@ -37,12 +37,7 @@
                 </dropdown>
             </grid>
         </hbox>
-        <vbox text="Left Arm" />
-        <vbox text="Right Arm" />
-        <vbox text="Head" />
-        <vbox text="Torso" />
-        <vbox text="Left Leg" />
-        <vbox text="Right Leg" />
-
+        <vbox text="Page 2" />
+        <vbox text="Page 3" />
     </tabview>
 </dialog>

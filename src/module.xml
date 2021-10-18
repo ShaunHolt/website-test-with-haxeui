@@ -1,9 +1,4 @@
+<?xml version="1.0" encoding="utf-8" ?>
 <module preload="all">
-	<components>
-    	<component class="custom.Video" alias="video" />
-        <!-- alternative method for entire package (without aliases)
-        <component package="custom" />
-        -->
-		<component class="custom.Audio" alias="audio" />
-    </components>
+
 </module>
