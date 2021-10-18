@@ -2,6 +2,7 @@
 
 
     <absolute id="box1" width="400" height="400" style="border: 0px solid #ababab" >
+
         <button text="Videos" id="customNonModalDialogButtonVideos" styleName="styled-button" style="background-opacity: .1" left="25" top="110" />
         <button text="Social" id="customNonModalDialogButtonSocial" styleName="styled-button" style="background-opacity: .1" left="25" top="160" />
         <button text="Sensors" id="customNonModalDialogButtonSensors" styleName="styled-button" style="background-opacity: .1" left="25" top="210" />

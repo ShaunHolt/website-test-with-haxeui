@@ -19,56 +19,56 @@ class Main {
             
             var customNonModalDialogButtonVideos = main.findComponent("customNonModalDialogButtonVideos", Button);
             customNonModalDialogButtonVideos.onClick = function(e) {
-                var dialog = new CustomDialog();
+                var dialog = new CustomVideos();
                 dialog.width = 500;
                 dialog.show();
             }
 
             var customNonModalDialogButtonSocial = main.findComponent("customNonModalDialogButtonSocial", Button);
             customNonModalDialogButtonSocial.onClick = function(e) {
-                var dialogsocial = new CustomDialog();
+                var dialogsocial = new CustomSocial();
                 dialogsocial.width = 500;
                 dialogsocial.show();
             }
            
             var customNonModalDialogButtonSensors = main.findComponent("customNonModalDialogButtonSensors", Button);
             customNonModalDialogButtonSensors.onClick = function(e) {
-                var dialogsensors = new CustomDialog();
+                var dialogsensors = new CustomSensors();
                 dialogsensors.width = 500;
                 dialogsensors.show();
             }
 
             var customNonModalDialogButtonRobotics = main.findComponent("customNonModalDialogButtonRobotics", Button);
             customNonModalDialogButtonRobotics.onClick = function(e) {
-                var dialogrobotics = new CustomDialog();
+                var dialogrobotics = new CustomRobotics();
                 dialogrobotics.width = 500;
                 dialogrobotics.show();
             }
 
             var customNonModalDialogButtonToolbox = main.findComponent("customNonModalDialogButtonToolbox", Button);
             customNonModalDialogButtonToolbox.onClick = function(e) {
-                var dialogtoolbox = new CustomDialog();
+                var dialogtoolbox = new CustomToolbox();
                 dialogtoolbox.width = 500;
                 dialogtoolbox.show();
             }
 
             var customNonModalDialogButtonGuides = main.findComponent("customNonModalDialogButtonGuides", Button);
             customNonModalDialogButtonGuides.onClick = function(e) {
-                var dialogguides = new CustomDialog();
+                var dialogguides = new CustomGuides();
                 dialogguides.width = 500;
                 dialogguides.show();
             }
 
             var customNonModalDialogButtonAbout = main.findComponent("customNonModalDialogButtonAbout", Button);
             customNonModalDialogButtonAbout.onClick = function(e) {
-                var dialogabout = new CustomDialog();
+                var dialogabout = new CustomAbout();
                 dialogabout.width = 500;
                 dialogabout.show();
             }
 
             var customNonModalDialogButtonHosting = main.findComponent("customNonModalDialogButtonHosting", Button);
             customNonModalDialogButtonHosting.onClick = function(e) {
-                var dialoghosting = new CustomDialog();
+                var dialoghosting = new CustomHosting();
                 dialoghosting.width = 500;
                 dialoghosting.show();
             }

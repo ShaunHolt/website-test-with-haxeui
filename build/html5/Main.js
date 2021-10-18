@@ -4641,7 +4641,7 @@ haxe_ui_containers_dialogs_Dialog.prototype = $extend(haxe_ui_backend_DialogBase
 	,__class__: haxe_ui_containers_dialogs_Dialog
 	,__properties__: $extend(haxe_ui_backend_DialogBase.prototype.__properties__,{set_onDialogClosed:"set_onDialogClosed"})
 });
-var CustomDialog = function() {
+var CustomAbout = function() {
 	haxe_ui_containers_dialogs_Dialog.call(this);
 	var c0 = new haxe_ui_containers_TabView();
 	c0.set_percentWidth(100.);
@@ -4711,8 +4711,9 @@ var CustomDialog = function() {
 	c0.addComponent(c11);
 	this.addComponent(c0);
 	this.set_height(300.);
+	this.set_styleString("background-opacity: .1");
 	this.bindingRoot = true;
-	this.set_title("Custom Dialog");
+	this.set_title("About");
 	this.modal = false;
 	var larr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.apply}}").split("|");
 	var rarr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.cancel}}").split("|");
@@ -4726,10 +4727,10 @@ var CustomDialog = function() {
 	}
 	this.buttons = larr.join("|");
 };
-$hxClasses["CustomDialog"] = CustomDialog;
-CustomDialog.__name__ = "CustomDialog";
-CustomDialog.__super__ = haxe_ui_containers_dialogs_Dialog;
-CustomDialog.prototype = $extend(haxe_ui_containers_dialogs_Dialog.prototype,{
+$hxClasses["CustomAbout"] = CustomAbout;
+CustomAbout.__name__ = "CustomAbout";
+CustomAbout.__super__ = haxe_ui_containers_dialogs_Dialog;
+CustomAbout.prototype = $extend(haxe_ui_containers_dialogs_Dialog.prototype,{
 	registerBehaviours: function() {
 		haxe_ui_containers_dialogs_Dialog.prototype.registerBehaviours.call(this);
 	}
@@ -4747,9 +4748,786 @@ CustomDialog.prototype = $extend(haxe_ui_containers_dialogs_Dialog.prototype,{
 		return c;
 	}
 	,self: function() {
-		return new CustomDialog();
+		return new CustomAbout();
 	}
-	,__class__: CustomDialog
+	,__class__: CustomAbout
+});
+var CustomGuides = function() {
+	haxe_ui_containers_dialogs_Dialog.call(this);
+	var c0 = new haxe_ui_containers_TabView();
+	c0.set_percentWidth(100.);
+	c0.set_percentHeight(100.);
+	var c1 = new haxe_ui_containers_HBox();
+	c1.set_percentWidth(100.);
+	c1.set_percentHeight(100.);
+	c1.set_text("Page 1");
+	var c2 = new haxe_ui_containers_ListView();
+	c2.set_width(200.);
+	c2.set_percentHeight(100.);
+	var ds2 = new haxe_ui_data_ArrayDataSource();
+	ds2.add({ text : "Item 1", id : "item"});
+	ds2.add({ text : "Item 2", id : "item"});
+	ds2.add({ text : "Item 3", id : "item"});
+	ds2.add({ text : "Item 4", id : "item"});
+	ds2.add({ text : "Item 5", id : "item"});
+	ds2.add({ text : "Item 6", id : "item"});
+	ds2.add({ text : "Item 7", id : "item"});
+	ds2.add({ text : "Item 8", id : "item"});
+	ds2.add({ text : "Item 9", id : "item"});
+	ds2.add({ text : "Item 10", id : "item"});
+	ds2.add({ text : "Item 11", id : "item"});
+	ds2.add({ text : "Item 12", id : "item"});
+	ds2.add({ text : "Item 13", id : "item"});
+	ds2.add({ text : "Item 14", id : "item"});
+	ds2.add({ text : "Item 15", id : "item"});
+	c2.set_dataSource(ds2);
+	c1.addComponent(c2);
+	var c3 = new haxe_ui_containers_Grid();
+	c3.set_percentWidth(100.);
+	c3.set_styleString("padding: 5px;");
+	c3.set_columns(2);
+	var c4 = new haxe_ui_components_Label();
+	c4.set_text("First Name");
+	c4.set_verticalAlign("center");
+	c3.addComponent(c4);
+	var c5 = new haxe_ui_components_TextField();
+	c5.set_percentWidth(100.);
+	c3.addComponent(c5);
+	var c6 = new haxe_ui_components_Label();
+	c6.set_text("Last Name");
+	c6.set_verticalAlign("center");
+	c3.addComponent(c6);
+	var c7 = new haxe_ui_components_TextField();
+	c7.set_percentWidth(100.);
+	c3.addComponent(c7);
+	var c8 = new haxe_ui_components_Label();
+	c8.set_text("Sex");
+	c8.set_verticalAlign("center");
+	c3.addComponent(c8);
+	var c9 = new haxe_ui_components_DropDown();
+	c9.set_percentWidth(100.);
+	c9.set_selectedIndex(0);
+	var ds9 = new haxe_ui_data_ArrayDataSource();
+	ds9.add({ text : "Male", id : "item"});
+	ds9.add({ text : "Female", id : "item"});
+	c9.set_dataSource(ds9);
+	c3.addComponent(c9);
+	c1.addComponent(c3);
+	c0.addComponent(c1);
+	var c10 = new haxe_ui_containers_VBox();
+	c10.set_text("Page 2");
+	c0.addComponent(c10);
+	var c11 = new haxe_ui_containers_VBox();
+	c11.set_text("Page 3");
+	c0.addComponent(c11);
+	this.addComponent(c0);
+	this.set_height(300.);
+	this.set_styleString("background-opacity: .1");
+	this.bindingRoot = true;
+	this.set_title("Guides");
+	this.modal = false;
+	var larr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.apply}}").split("|");
+	var rarr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.cancel}}").split("|");
+	var _g = 0;
+	while(_g < rarr.length) {
+		var r = rarr[_g];
+		++_g;
+		if(larr.indexOf(r) == -1) {
+			larr.push(r);
+		}
+	}
+	this.buttons = larr.join("|");
+};
+$hxClasses["CustomGuides"] = CustomGuides;
+CustomGuides.__name__ = "CustomGuides";
+CustomGuides.__super__ = haxe_ui_containers_dialogs_Dialog;
+CustomGuides.prototype = $extend(haxe_ui_containers_dialogs_Dialog.prototype,{
+	registerBehaviours: function() {
+		haxe_ui_containers_dialogs_Dialog.prototype.registerBehaviours.call(this);
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_containers_dialogs_Dialog.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new CustomGuides();
+	}
+	,__class__: CustomGuides
+});
+var CustomHosting = function() {
+	haxe_ui_containers_dialogs_Dialog.call(this);
+	var c0 = new haxe_ui_containers_TabView();
+	c0.set_percentWidth(100.);
+	c0.set_percentHeight(100.);
+	var c1 = new haxe_ui_containers_HBox();
+	c1.set_percentWidth(100.);
+	c1.set_percentHeight(100.);
+	c1.set_text("Page 1");
+	var c2 = new haxe_ui_containers_ListView();
+	c2.set_width(200.);
+	c2.set_percentHeight(100.);
+	var ds2 = new haxe_ui_data_ArrayDataSource();
+	ds2.add({ text : "Item 1", id : "item"});
+	ds2.add({ text : "Item 2", id : "item"});
+	ds2.add({ text : "Item 3", id : "item"});
+	ds2.add({ text : "Item 4", id : "item"});
+	ds2.add({ text : "Item 5", id : "item"});
+	ds2.add({ text : "Item 6", id : "item"});
+	ds2.add({ text : "Item 7", id : "item"});
+	ds2.add({ text : "Item 8", id : "item"});
+	ds2.add({ text : "Item 9", id : "item"});
+	ds2.add({ text : "Item 10", id : "item"});
+	ds2.add({ text : "Item 11", id : "item"});
+	ds2.add({ text : "Item 12", id : "item"});
+	ds2.add({ text : "Item 13", id : "item"});
+	ds2.add({ text : "Item 14", id : "item"});
+	ds2.add({ text : "Item 15", id : "item"});
+	c2.set_dataSource(ds2);
+	c1.addComponent(c2);
+	var c3 = new haxe_ui_containers_Grid();
+	c3.set_percentWidth(100.);
+	c3.set_styleString("padding: 5px;");
+	c3.set_columns(2);
+	var c4 = new haxe_ui_components_Label();
+	c4.set_text("First Name");
+	c4.set_verticalAlign("center");
+	c3.addComponent(c4);
+	var c5 = new haxe_ui_components_TextField();
+	c5.set_percentWidth(100.);
+	c3.addComponent(c5);
+	var c6 = new haxe_ui_components_Label();
+	c6.set_text("Last Name");
+	c6.set_verticalAlign("center");
+	c3.addComponent(c6);
+	var c7 = new haxe_ui_components_TextField();
+	c7.set_percentWidth(100.);
+	c3.addComponent(c7);
+	var c8 = new haxe_ui_components_Label();
+	c8.set_text("Sex");
+	c8.set_verticalAlign("center");
+	c3.addComponent(c8);
+	var c9 = new haxe_ui_components_DropDown();
+	c9.set_percentWidth(100.);
+	c9.set_selectedIndex(0);
+	var ds9 = new haxe_ui_data_ArrayDataSource();
+	ds9.add({ text : "Male", id : "item"});
+	ds9.add({ text : "Female", id : "item"});
+	c9.set_dataSource(ds9);
+	c3.addComponent(c9);
+	c1.addComponent(c3);
+	c0.addComponent(c1);
+	var c10 = new haxe_ui_containers_VBox();
+	c10.set_text("Page 2");
+	c0.addComponent(c10);
+	var c11 = new haxe_ui_containers_VBox();
+	c11.set_text("Page 3");
+	c0.addComponent(c11);
+	this.addComponent(c0);
+	this.set_height(300.);
+	this.set_styleString("background-opacity: .1");
+	this.bindingRoot = true;
+	this.set_title("Hosting");
+	this.modal = false;
+	var larr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.apply}}").split("|");
+	var rarr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.cancel}}").split("|");
+	var _g = 0;
+	while(_g < rarr.length) {
+		var r = rarr[_g];
+		++_g;
+		if(larr.indexOf(r) == -1) {
+			larr.push(r);
+		}
+	}
+	this.buttons = larr.join("|");
+};
+$hxClasses["CustomHosting"] = CustomHosting;
+CustomHosting.__name__ = "CustomHosting";
+CustomHosting.__super__ = haxe_ui_containers_dialogs_Dialog;
+CustomHosting.prototype = $extend(haxe_ui_containers_dialogs_Dialog.prototype,{
+	registerBehaviours: function() {
+		haxe_ui_containers_dialogs_Dialog.prototype.registerBehaviours.call(this);
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_containers_dialogs_Dialog.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new CustomHosting();
+	}
+	,__class__: CustomHosting
+});
+var CustomRobotics = function() {
+	haxe_ui_containers_dialogs_Dialog.call(this);
+	var c0 = new haxe_ui_containers_TabView();
+	c0.set_percentWidth(100.);
+	c0.set_percentHeight(100.);
+	var c1 = new haxe_ui_containers_HBox();
+	c1.set_percentWidth(100.);
+	c1.set_percentHeight(100.);
+	c1.set_text("Page 1");
+	var c2 = new haxe_ui_containers_ListView();
+	c2.set_width(200.);
+	c2.set_percentHeight(100.);
+	var ds2 = new haxe_ui_data_ArrayDataSource();
+	ds2.add({ text : "Item 1", id : "item"});
+	ds2.add({ text : "Item 2", id : "item"});
+	ds2.add({ text : "Item 3", id : "item"});
+	ds2.add({ text : "Item 4", id : "item"});
+	ds2.add({ text : "Item 5", id : "item"});
+	ds2.add({ text : "Item 6", id : "item"});
+	ds2.add({ text : "Item 7", id : "item"});
+	ds2.add({ text : "Item 8", id : "item"});
+	ds2.add({ text : "Item 9", id : "item"});
+	ds2.add({ text : "Item 10", id : "item"});
+	ds2.add({ text : "Item 11", id : "item"});
+	ds2.add({ text : "Item 12", id : "item"});
+	ds2.add({ text : "Item 13", id : "item"});
+	ds2.add({ text : "Item 14", id : "item"});
+	ds2.add({ text : "Item 15", id : "item"});
+	c2.set_dataSource(ds2);
+	c1.addComponent(c2);
+	var c3 = new haxe_ui_containers_Grid();
+	c3.set_percentWidth(100.);
+	c3.set_styleString("padding: 5px;");
+	c3.set_columns(2);
+	var c4 = new haxe_ui_components_Label();
+	c4.set_text("First Name");
+	c4.set_verticalAlign("center");
+	c3.addComponent(c4);
+	var c5 = new haxe_ui_components_TextField();
+	c5.set_percentWidth(100.);
+	c3.addComponent(c5);
+	var c6 = new haxe_ui_components_Label();
+	c6.set_text("Last Name");
+	c6.set_verticalAlign("center");
+	c3.addComponent(c6);
+	var c7 = new haxe_ui_components_TextField();
+	c7.set_percentWidth(100.);
+	c3.addComponent(c7);
+	var c8 = new haxe_ui_components_Label();
+	c8.set_text("Sex");
+	c8.set_verticalAlign("center");
+	c3.addComponent(c8);
+	var c9 = new haxe_ui_components_DropDown();
+	c9.set_percentWidth(100.);
+	c9.set_selectedIndex(0);
+	var ds9 = new haxe_ui_data_ArrayDataSource();
+	ds9.add({ text : "Male", id : "item"});
+	ds9.add({ text : "Female", id : "item"});
+	c9.set_dataSource(ds9);
+	c3.addComponent(c9);
+	c1.addComponent(c3);
+	c0.addComponent(c1);
+	var c10 = new haxe_ui_containers_VBox();
+	c10.set_text("Page 2");
+	c0.addComponent(c10);
+	var c11 = new haxe_ui_containers_VBox();
+	c11.set_text("Page 3");
+	c0.addComponent(c11);
+	this.addComponent(c0);
+	this.set_height(300.);
+	this.set_styleString("background-opacity: .1");
+	this.bindingRoot = true;
+	this.set_title("Robotics");
+	this.modal = false;
+	var larr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.apply}}").split("|");
+	var rarr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.cancel}}").split("|");
+	var _g = 0;
+	while(_g < rarr.length) {
+		var r = rarr[_g];
+		++_g;
+		if(larr.indexOf(r) == -1) {
+			larr.push(r);
+		}
+	}
+	this.buttons = larr.join("|");
+};
+$hxClasses["CustomRobotics"] = CustomRobotics;
+CustomRobotics.__name__ = "CustomRobotics";
+CustomRobotics.__super__ = haxe_ui_containers_dialogs_Dialog;
+CustomRobotics.prototype = $extend(haxe_ui_containers_dialogs_Dialog.prototype,{
+	registerBehaviours: function() {
+		haxe_ui_containers_dialogs_Dialog.prototype.registerBehaviours.call(this);
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_containers_dialogs_Dialog.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new CustomRobotics();
+	}
+	,__class__: CustomRobotics
+});
+var CustomSensors = function() {
+	haxe_ui_containers_dialogs_Dialog.call(this);
+	var c0 = new haxe_ui_containers_TabView();
+	c0.set_percentWidth(100.);
+	c0.set_percentHeight(100.);
+	var c1 = new haxe_ui_containers_HBox();
+	c1.set_percentWidth(100.);
+	c1.set_percentHeight(100.);
+	c1.set_text("Page 1");
+	var c2 = new haxe_ui_containers_ListView();
+	c2.set_width(200.);
+	c2.set_percentHeight(100.);
+	var ds2 = new haxe_ui_data_ArrayDataSource();
+	ds2.add({ text : "Item 1", id : "item"});
+	ds2.add({ text : "Item 2", id : "item"});
+	ds2.add({ text : "Item 3", id : "item"});
+	ds2.add({ text : "Item 4", id : "item"});
+	ds2.add({ text : "Item 5", id : "item"});
+	ds2.add({ text : "Item 6", id : "item"});
+	ds2.add({ text : "Item 7", id : "item"});
+	ds2.add({ text : "Item 8", id : "item"});
+	ds2.add({ text : "Item 9", id : "item"});
+	ds2.add({ text : "Item 10", id : "item"});
+	ds2.add({ text : "Item 11", id : "item"});
+	ds2.add({ text : "Item 12", id : "item"});
+	ds2.add({ text : "Item 13", id : "item"});
+	ds2.add({ text : "Item 14", id : "item"});
+	ds2.add({ text : "Item 15", id : "item"});
+	c2.set_dataSource(ds2);
+	c1.addComponent(c2);
+	var c3 = new haxe_ui_containers_Grid();
+	c3.set_percentWidth(100.);
+	c3.set_styleString("padding: 5px;");
+	c3.set_columns(2);
+	var c4 = new haxe_ui_components_Label();
+	c4.set_text("First Name");
+	c4.set_verticalAlign("center");
+	c3.addComponent(c4);
+	var c5 = new haxe_ui_components_TextField();
+	c5.set_percentWidth(100.);
+	c3.addComponent(c5);
+	var c6 = new haxe_ui_components_Label();
+	c6.set_text("Last Name");
+	c6.set_verticalAlign("center");
+	c3.addComponent(c6);
+	var c7 = new haxe_ui_components_TextField();
+	c7.set_percentWidth(100.);
+	c3.addComponent(c7);
+	var c8 = new haxe_ui_components_Label();
+	c8.set_text("Sex");
+	c8.set_verticalAlign("center");
+	c3.addComponent(c8);
+	var c9 = new haxe_ui_components_DropDown();
+	c9.set_percentWidth(100.);
+	c9.set_selectedIndex(0);
+	var ds9 = new haxe_ui_data_ArrayDataSource();
+	ds9.add({ text : "Male", id : "item"});
+	ds9.add({ text : "Female", id : "item"});
+	c9.set_dataSource(ds9);
+	c3.addComponent(c9);
+	c1.addComponent(c3);
+	c0.addComponent(c1);
+	var c10 = new haxe_ui_containers_VBox();
+	c10.set_text("Page 2");
+	c0.addComponent(c10);
+	var c11 = new haxe_ui_containers_VBox();
+	c11.set_text("Page 3");
+	c0.addComponent(c11);
+	this.addComponent(c0);
+	this.set_height(300.);
+	this.set_styleString("background-opacity: .1");
+	this.bindingRoot = true;
+	this.set_title("Sensors");
+	this.modal = false;
+	var larr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.apply}}").split("|");
+	var rarr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.cancel}}").split("|");
+	var _g = 0;
+	while(_g < rarr.length) {
+		var r = rarr[_g];
+		++_g;
+		if(larr.indexOf(r) == -1) {
+			larr.push(r);
+		}
+	}
+	this.buttons = larr.join("|");
+};
+$hxClasses["CustomSensors"] = CustomSensors;
+CustomSensors.__name__ = "CustomSensors";
+CustomSensors.__super__ = haxe_ui_containers_dialogs_Dialog;
+CustomSensors.prototype = $extend(haxe_ui_containers_dialogs_Dialog.prototype,{
+	registerBehaviours: function() {
+		haxe_ui_containers_dialogs_Dialog.prototype.registerBehaviours.call(this);
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_containers_dialogs_Dialog.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new CustomSensors();
+	}
+	,__class__: CustomSensors
+});
+var CustomSocial = function() {
+	haxe_ui_containers_dialogs_Dialog.call(this);
+	var c0 = new haxe_ui_containers_TabView();
+	c0.set_percentWidth(100.);
+	c0.set_percentHeight(100.);
+	var c1 = new haxe_ui_containers_HBox();
+	c1.set_percentWidth(100.);
+	c1.set_percentHeight(100.);
+	c1.set_text("Page 1");
+	var c2 = new haxe_ui_containers_ListView();
+	c2.set_width(200.);
+	c2.set_percentHeight(100.);
+	var ds2 = new haxe_ui_data_ArrayDataSource();
+	ds2.add({ text : "Item 1", id : "item"});
+	ds2.add({ text : "Item 2", id : "item"});
+	ds2.add({ text : "Item 3", id : "item"});
+	ds2.add({ text : "Item 4", id : "item"});
+	ds2.add({ text : "Item 5", id : "item"});
+	ds2.add({ text : "Item 6", id : "item"});
+	ds2.add({ text : "Item 7", id : "item"});
+	ds2.add({ text : "Item 8", id : "item"});
+	ds2.add({ text : "Item 9", id : "item"});
+	ds2.add({ text : "Item 10", id : "item"});
+	ds2.add({ text : "Item 11", id : "item"});
+	ds2.add({ text : "Item 12", id : "item"});
+	ds2.add({ text : "Item 13", id : "item"});
+	ds2.add({ text : "Item 14", id : "item"});
+	ds2.add({ text : "Item 15", id : "item"});
+	c2.set_dataSource(ds2);
+	c1.addComponent(c2);
+	var c3 = new haxe_ui_containers_Grid();
+	c3.set_percentWidth(100.);
+	c3.set_styleString("padding: 5px;");
+	c3.set_columns(2);
+	var c4 = new haxe_ui_components_Label();
+	c4.set_text("First Name");
+	c4.set_verticalAlign("center");
+	c3.addComponent(c4);
+	var c5 = new haxe_ui_components_TextField();
+	c5.set_percentWidth(100.);
+	c3.addComponent(c5);
+	var c6 = new haxe_ui_components_Label();
+	c6.set_text("Last Name");
+	c6.set_verticalAlign("center");
+	c3.addComponent(c6);
+	var c7 = new haxe_ui_components_TextField();
+	c7.set_percentWidth(100.);
+	c3.addComponent(c7);
+	var c8 = new haxe_ui_components_Label();
+	c8.set_text("Sex");
+	c8.set_verticalAlign("center");
+	c3.addComponent(c8);
+	var c9 = new haxe_ui_components_DropDown();
+	c9.set_percentWidth(100.);
+	c9.set_selectedIndex(0);
+	var ds9 = new haxe_ui_data_ArrayDataSource();
+	ds9.add({ text : "Male", id : "item"});
+	ds9.add({ text : "Female", id : "item"});
+	c9.set_dataSource(ds9);
+	c3.addComponent(c9);
+	c1.addComponent(c3);
+	c0.addComponent(c1);
+	var c10 = new haxe_ui_containers_VBox();
+	c10.set_text("Page 2");
+	c0.addComponent(c10);
+	var c11 = new haxe_ui_containers_VBox();
+	c11.set_text("Page 3");
+	c0.addComponent(c11);
+	this.addComponent(c0);
+	this.set_height(300.);
+	this.set_styleString("background-opacity: .1");
+	this.bindingRoot = true;
+	this.set_title("Social");
+	this.modal = false;
+	var larr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.apply}}").split("|");
+	var rarr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.cancel}}").split("|");
+	var _g = 0;
+	while(_g < rarr.length) {
+		var r = rarr[_g];
+		++_g;
+		if(larr.indexOf(r) == -1) {
+			larr.push(r);
+		}
+	}
+	this.buttons = larr.join("|");
+};
+$hxClasses["CustomSocial"] = CustomSocial;
+CustomSocial.__name__ = "CustomSocial";
+CustomSocial.__super__ = haxe_ui_containers_dialogs_Dialog;
+CustomSocial.prototype = $extend(haxe_ui_containers_dialogs_Dialog.prototype,{
+	registerBehaviours: function() {
+		haxe_ui_containers_dialogs_Dialog.prototype.registerBehaviours.call(this);
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_containers_dialogs_Dialog.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new CustomSocial();
+	}
+	,__class__: CustomSocial
+});
+var CustomToolbox = function() {
+	haxe_ui_containers_dialogs_Dialog.call(this);
+	var c0 = new haxe_ui_containers_TabView();
+	c0.set_percentWidth(100.);
+	c0.set_percentHeight(100.);
+	var c1 = new haxe_ui_containers_HBox();
+	c1.set_percentWidth(100.);
+	c1.set_percentHeight(100.);
+	c1.set_text("Page 1");
+	var c2 = new haxe_ui_containers_ListView();
+	c2.set_width(200.);
+	c2.set_percentHeight(100.);
+	var ds2 = new haxe_ui_data_ArrayDataSource();
+	ds2.add({ text : "Item 1", id : "item"});
+	ds2.add({ text : "Item 2", id : "item"});
+	ds2.add({ text : "Item 3", id : "item"});
+	ds2.add({ text : "Item 4", id : "item"});
+	ds2.add({ text : "Item 5", id : "item"});
+	ds2.add({ text : "Item 6", id : "item"});
+	ds2.add({ text : "Item 7", id : "item"});
+	ds2.add({ text : "Item 8", id : "item"});
+	ds2.add({ text : "Item 9", id : "item"});
+	ds2.add({ text : "Item 10", id : "item"});
+	ds2.add({ text : "Item 11", id : "item"});
+	ds2.add({ text : "Item 12", id : "item"});
+	ds2.add({ text : "Item 13", id : "item"});
+	ds2.add({ text : "Item 14", id : "item"});
+	ds2.add({ text : "Item 15", id : "item"});
+	c2.set_dataSource(ds2);
+	c1.addComponent(c2);
+	var c3 = new haxe_ui_containers_Grid();
+	c3.set_percentWidth(100.);
+	c3.set_styleString("padding: 5px;");
+	c3.set_columns(2);
+	var c4 = new haxe_ui_components_Label();
+	c4.set_text("First Name");
+	c4.set_verticalAlign("center");
+	c3.addComponent(c4);
+	var c5 = new haxe_ui_components_TextField();
+	c5.set_percentWidth(100.);
+	c3.addComponent(c5);
+	var c6 = new haxe_ui_components_Label();
+	c6.set_text("Last Name");
+	c6.set_verticalAlign("center");
+	c3.addComponent(c6);
+	var c7 = new haxe_ui_components_TextField();
+	c7.set_percentWidth(100.);
+	c3.addComponent(c7);
+	var c8 = new haxe_ui_components_Label();
+	c8.set_text("Sex");
+	c8.set_verticalAlign("center");
+	c3.addComponent(c8);
+	var c9 = new haxe_ui_components_DropDown();
+	c9.set_percentWidth(100.);
+	c9.set_selectedIndex(0);
+	var ds9 = new haxe_ui_data_ArrayDataSource();
+	ds9.add({ text : "Male", id : "item"});
+	ds9.add({ text : "Female", id : "item"});
+	c9.set_dataSource(ds9);
+	c3.addComponent(c9);
+	c1.addComponent(c3);
+	c0.addComponent(c1);
+	var c10 = new haxe_ui_containers_VBox();
+	c10.set_text("Page 2");
+	c0.addComponent(c10);
+	var c11 = new haxe_ui_containers_VBox();
+	c11.set_text("Page 3");
+	c0.addComponent(c11);
+	this.addComponent(c0);
+	this.set_height(300.);
+	this.set_styleString("background-opacity: .1");
+	this.bindingRoot = true;
+	this.set_title("Toolbox");
+	this.modal = false;
+	var larr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.apply}}").split("|");
+	var rarr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.cancel}}").split("|");
+	var _g = 0;
+	while(_g < rarr.length) {
+		var r = rarr[_g];
+		++_g;
+		if(larr.indexOf(r) == -1) {
+			larr.push(r);
+		}
+	}
+	this.buttons = larr.join("|");
+};
+$hxClasses["CustomToolbox"] = CustomToolbox;
+CustomToolbox.__name__ = "CustomToolbox";
+CustomToolbox.__super__ = haxe_ui_containers_dialogs_Dialog;
+CustomToolbox.prototype = $extend(haxe_ui_containers_dialogs_Dialog.prototype,{
+	registerBehaviours: function() {
+		haxe_ui_containers_dialogs_Dialog.prototype.registerBehaviours.call(this);
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_containers_dialogs_Dialog.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new CustomToolbox();
+	}
+	,__class__: CustomToolbox
+});
+var CustomVideos = function() {
+	haxe_ui_containers_dialogs_Dialog.call(this);
+	var c0 = new haxe_ui_containers_TabView();
+	c0.set_percentWidth(100.);
+	c0.set_percentHeight(100.);
+	var c1 = new haxe_ui_containers_HBox();
+	c1.set_percentWidth(100.);
+	c1.set_percentHeight(100.);
+	c1.set_text("Page 1");
+	var c2 = new haxe_ui_containers_ListView();
+	c2.set_width(200.);
+	c2.set_percentHeight(100.);
+	var ds2 = new haxe_ui_data_ArrayDataSource();
+	ds2.add({ text : "Item 1", id : "item"});
+	ds2.add({ text : "Item 2", id : "item"});
+	ds2.add({ text : "Item 3", id : "item"});
+	ds2.add({ text : "Item 4", id : "item"});
+	ds2.add({ text : "Item 5", id : "item"});
+	ds2.add({ text : "Item 6", id : "item"});
+	ds2.add({ text : "Item 7", id : "item"});
+	ds2.add({ text : "Item 8", id : "item"});
+	ds2.add({ text : "Item 9", id : "item"});
+	ds2.add({ text : "Item 10", id : "item"});
+	ds2.add({ text : "Item 11", id : "item"});
+	ds2.add({ text : "Item 12", id : "item"});
+	ds2.add({ text : "Item 13", id : "item"});
+	ds2.add({ text : "Item 14", id : "item"});
+	ds2.add({ text : "Item 15", id : "item"});
+	c2.set_dataSource(ds2);
+	c1.addComponent(c2);
+	var c3 = new haxe_ui_containers_Grid();
+	c3.set_percentWidth(100.);
+	c3.set_styleString("padding: 5px;");
+	c3.set_columns(2);
+	var c4 = new haxe_ui_components_Label();
+	c4.set_text("First Name");
+	c4.set_verticalAlign("center");
+	c3.addComponent(c4);
+	var c5 = new haxe_ui_components_TextField();
+	c5.set_percentWidth(100.);
+	c3.addComponent(c5);
+	var c6 = new haxe_ui_components_Label();
+	c6.set_text("Last Name");
+	c6.set_verticalAlign("center");
+	c3.addComponent(c6);
+	var c7 = new haxe_ui_components_TextField();
+	c7.set_percentWidth(100.);
+	c3.addComponent(c7);
+	var c8 = new haxe_ui_components_Label();
+	c8.set_text("Sex");
+	c8.set_verticalAlign("center");
+	c3.addComponent(c8);
+	var c9 = new haxe_ui_components_DropDown();
+	c9.set_percentWidth(100.);
+	c9.set_selectedIndex(0);
+	var ds9 = new haxe_ui_data_ArrayDataSource();
+	ds9.add({ text : "Male", id : "item"});
+	ds9.add({ text : "Female", id : "item"});
+	c9.set_dataSource(ds9);
+	c3.addComponent(c9);
+	c1.addComponent(c3);
+	c0.addComponent(c1);
+	var c10 = new haxe_ui_containers_VBox();
+	c10.set_text("Page 2");
+	c0.addComponent(c10);
+	var c11 = new haxe_ui_containers_VBox();
+	c11.set_text("Page 3");
+	c0.addComponent(c11);
+	this.addComponent(c0);
+	this.set_height(300.);
+	this.set_styleString("background-opacity: .1");
+	this.bindingRoot = true;
+	this.set_title("Videos");
+	this.modal = false;
+	var larr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.apply}}").split("|");
+	var rarr = haxe_ui_containers_dialogs_DialogButton.toString("{{dialog.cancel}}").split("|");
+	var _g = 0;
+	while(_g < rarr.length) {
+		var r = rarr[_g];
+		++_g;
+		if(larr.indexOf(r) == -1) {
+			larr.push(r);
+		}
+	}
+	this.buttons = larr.join("|");
+};
+$hxClasses["CustomVideos"] = CustomVideos;
+CustomVideos.__name__ = "CustomVideos";
+CustomVideos.__super__ = haxe_ui_containers_dialogs_Dialog;
+CustomVideos.prototype = $extend(haxe_ui_containers_dialogs_Dialog.prototype,{
+	registerBehaviours: function() {
+		haxe_ui_containers_dialogs_Dialog.prototype.registerBehaviours.call(this);
+	}
+	,cloneComponent: function() {
+		var c = haxe_ui_containers_dialogs_Dialog.prototype.cloneComponent.call(this);
+		if((this._children == null ? [] : this._children).length != (c._children == null ? [] : c._children).length) {
+			var _g = 0;
+			var _g1 = this._children == null ? [] : this._children;
+			while(_g < _g1.length) {
+				var child = _g1[_g];
+				++_g;
+				c.addComponent(child.cloneComponent());
+			}
+		}
+		return c;
+	}
+	,self: function() {
+		return new CustomVideos();
+	}
+	,__class__: CustomVideos
 });
 var DateTools = function() { };
 $hxClasses["DateTools"] = DateTools;
@@ -5128,49 +5906,49 @@ Main.main = function() {
 		var main = rootComponent;
 		var customNonModalDialogButtonVideos = main.findComponent("customNonModalDialogButtonVideos",haxe_ui_components_Button);
 		customNonModalDialogButtonVideos.set_onClick(function(e) {
-			var dialog = new CustomDialog();
+			var dialog = new CustomVideos();
 			dialog.set_width(500);
 			dialog.show();
 		});
 		var customNonModalDialogButtonSocial = main.findComponent("customNonModalDialogButtonSocial",haxe_ui_components_Button);
 		customNonModalDialogButtonSocial.set_onClick(function(e) {
-			var dialogsocial = new CustomDialog();
+			var dialogsocial = new CustomSocial();
 			dialogsocial.set_width(500);
 			dialogsocial.show();
 		});
 		var customNonModalDialogButtonSensors = main.findComponent("customNonModalDialogButtonSensors",haxe_ui_components_Button);
 		customNonModalDialogButtonSensors.set_onClick(function(e) {
-			var dialogsensors = new CustomDialog();
+			var dialogsensors = new CustomSensors();
 			dialogsensors.set_width(500);
 			dialogsensors.show();
 		});
 		var customNonModalDialogButtonRobotics = main.findComponent("customNonModalDialogButtonRobotics",haxe_ui_components_Button);
 		customNonModalDialogButtonRobotics.set_onClick(function(e) {
-			var dialogrobotics = new CustomDialog();
+			var dialogrobotics = new CustomRobotics();
 			dialogrobotics.set_width(500);
 			dialogrobotics.show();
 		});
 		var customNonModalDialogButtonToolbox = main.findComponent("customNonModalDialogButtonToolbox",haxe_ui_components_Button);
 		customNonModalDialogButtonToolbox.set_onClick(function(e) {
-			var dialogtoolbox = new CustomDialog();
+			var dialogtoolbox = new CustomToolbox();
 			dialogtoolbox.set_width(500);
 			dialogtoolbox.show();
 		});
 		var customNonModalDialogButtonGuides = main.findComponent("customNonModalDialogButtonGuides",haxe_ui_components_Button);
 		customNonModalDialogButtonGuides.set_onClick(function(e) {
-			var dialogguides = new CustomDialog();
+			var dialogguides = new CustomGuides();
 			dialogguides.set_width(500);
 			dialogguides.show();
 		});
 		var customNonModalDialogButtonAbout = main.findComponent("customNonModalDialogButtonAbout",haxe_ui_components_Button);
 		customNonModalDialogButtonAbout.set_onClick(function(e) {
-			var dialogabout = new CustomDialog();
+			var dialogabout = new CustomAbout();
 			dialogabout.set_width(500);
 			dialogabout.show();
 		});
 		var customNonModalDialogButtonHosting = main.findComponent("customNonModalDialogButtonHosting",haxe_ui_components_Button);
 		customNonModalDialogButtonHosting.set_onClick(function(e) {
-			var dialoghosting = new CustomDialog();
+			var dialoghosting = new CustomHosting();
 			dialoghosting.set_width(500);
 			dialoghosting.show();
 		});

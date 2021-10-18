@@ -20,22 +20,3 @@ h1{
    }
 }
 
-
-.styled-button {
-    background: #79bbff #378de5;
-    border: 3px solid #337bc4;
-    border-radius:10px;
-    padding:10px 25px;
-    font-size: 16px;
-    color: white;
-    filter: drop-shadow(1, 45, #000000, 0.2, 0, 0, 0, 3, false);
-}
-            
-.styled-button:hover {
-    background: #add6ff #66a8eb;
-}
-            
-.styled-button:down {
-    background: #47a3ff #1b75d0;
-    border-color: #28619a;
-}
