@@ -6,9 +6,10 @@
     <meta name="description" content="" />
     <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.1.3/css/bootstrap.min.css'><link rel="stylesheet" href="./style.css">
 
+<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 
 </head>
-<body style="background-color:black;">
+<body onload="startTime(); startDate()" style="background-color:black;">
 
 <h1 class="text-center">The Perspective Corner</h1>
 
@@ -21,6 +22,21 @@
         <script src="build/html5/Main.js"></script>
 
 
+    <div class="container">
+      <div id="date"></div>
+      <div id="display"></div>
+      <div id="content">
+        <p id="quote">"the people who are crazy enough to think they can change the world are the ones who do." <br/>- Steve Jobs</p>
+      </div>
+    </div>
+    <div id="b-nav">
+      <ul>
+        <button id="gen" onclick="genQuote()">New Quote</button>
+
+      </ul>
+    </div>
+<!-- partial -->
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.min.js'></script><script  src="./script.js"></script>
 
 </body>
 </html>

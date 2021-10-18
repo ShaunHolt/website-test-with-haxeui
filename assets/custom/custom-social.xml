@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<dialog height="300" style="background-opacity: .1">
+<dialog height="300" >
     <tabview width="100%" height="100%" >
         <hbox text="Page 1" width="100%" height="100%">
             <listview width="200" height="100%">
